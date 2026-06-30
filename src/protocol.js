@@ -15,10 +15,11 @@ const PEER_TIMEOUT_MS = 15_000;
 export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) {
   let state = createInitialState(roomId);
   let revealPending = false;
+  let revealTimeout = null;
   let hbTimer = null;
 
   const self = { id: userId, name: userName, lastSeen: Date.now(), online: true };
-  state.participants[userId] = self;
+  state.participants[userId] = { ...self };
   state.votes[userId] = null;
 
   const room = joinRoom({ appId: APP_ID }, roomId);
@@ -53,11 +54,18 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     state.votes = v;
   }
 
+  function cancelReveal() {
+    clearTimeout(revealTimeout);
+    revealTimeout = null;
+    revealPending = false;
+  }
+
   function triggerReveal() {
     if (revealPending) return;
     revealPending = true;
     onCountdown?.();
-    setTimeout(() => {
+    revealTimeout = setTimeout(() => {
+      revealTimeout = null;
       state.phase = 'revealed';
       revealPending = false;
       emit();
@@ -126,19 +134,19 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   });
 
   getNextRound(({ roundId }) => {
+    cancelReveal();
     state.roundId = roundId;
     state.phase = 'voting';
-    revealPending = false;
     initVotes();
     emit();
   });
 
   getNewStory(({ index, title, roundId }) => {
+    cancelReveal();
     state.roundId = roundId;
     state.currentIndex = index;
     state.storyTitle = title;
     state.phase = 'voting';
-    revealPending = false;
     initVotes();
     emit();
   });
@@ -172,7 +180,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
   hbTimer = setInterval(() => {
     sendHeartbeat({ participantId: userId });
-    state.participants[userId].lastSeen = Date.now();
+    state.participants[userId] = { ...state.participants[userId], lastSeen: Date.now() };
 
     const now = Date.now();
     let changed = false;
@@ -226,9 +234,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
     nextRound() {
       const newRoundId = crypto.randomUUID();
+      cancelReveal();
       state.roundId = newRoundId;
       state.phase = 'voting';
-      revealPending = false;
       initVotes();
       sendNextRound({ roundId: newRoundId });
       emit();
@@ -238,11 +246,11 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       const newIndex = state.currentIndex < 0 ? 0 : state.currentIndex + 1;
       const title = state.stories[newIndex] ?? '';
       const newRoundId = crypto.randomUUID();
+      cancelReveal();
       state.roundId = newRoundId;
       state.currentIndex = newIndex;
       state.storyTitle = title;
       state.phase = 'waiting';
-      revealPending = false;
       initVotes();
       sendNewStory({ index: newIndex, title, roundId: newRoundId });
       emit();
@@ -263,6 +271,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     },
 
     destroy() {
+      cancelReveal();
       clearInterval(hbTimer);
       sendLeave({ participantId: userId });
     },
