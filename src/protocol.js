@@ -96,11 +96,19 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   });
 
   // ── Incoming events ───────────────────────────────────────────────────────
+  // Peers are untrusted input: every handler validates its payload and drops
+  // anything malformed rather than corrupting local state.
+
+  const isObj = (x) => x !== null && typeof x === 'object';
 
   getJoin((data, peerId) => {
-    const p = data.participant;
+    const p = isObj(data) ? data.participant : null;
+    if (!isObj(p) || typeof p.id !== 'string') return;
     peerMap.set(peerId, p.id);
-    state.participants[p.id] = { ...p, lastSeen: Date.now(), online: true };
+    // Build the record from known fields only — never spread peer-controlled
+    // keys (a peer could otherwise inject online/lastSeen for others).
+    const name = typeof p.name === 'string' ? p.name : 'Anon';
+    state.participants[p.id] = { id: p.id, name, lastSeen: Date.now(), online: true };
     if (state.votes[p.id] === undefined) state.votes[p.id] = null;
     emit();
     // Respond directly to the joiner with latest state
@@ -112,7 +120,8 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     const knownOthers = Object.keys(state.participants).filter(id => id !== userId);
     if (knownOthers.length > 0) return;
 
-    const incoming = data.state;
+    const incoming = isObj(data) ? data.state : null;
+    if (!isObj(incoming) || !isObj(incoming.participants) || !isObj(incoming.votes)) return;
     state = { ...incoming };
     // Re-assert self
     state.participants[userId] = { ...self, lastSeen: Date.now(), online: true };
@@ -121,8 +130,12 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     emit();
   });
 
-  getVote(({ participantId, card, roundId }) => {
+  getVote((data) => {
+    if (!isObj(data)) return;
+    const { participantId, card, roundId } = data;
     if (roundId !== state.roundId) return;
+    // Ignore votes from peers we don't know — no writing arbitrary vote keys.
+    if (!state.participants[participantId]) return;
     state.votes[participantId] = card;
     emit();
     checkAutoReveal();
@@ -151,14 +164,17 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     emit();
   });
 
-  getStoriesLoad(({ stories }) => {
-    state.stories = stories;
+  getStoriesLoad((data) => {
+    const stories = isObj(data) ? data.stories : null;
+    if (!Array.isArray(stories)) return;
+    state.stories = stories.filter((s) => typeof s === 'string');
     state.currentIndex = -1;
     emit();
   });
 
-  getAutoReveal(({ enabled }) => {
-    state.autoReveal = enabled;
+  getAutoReveal((data) => {
+    if (!isObj(data) || typeof data.enabled !== 'boolean') return;
+    state.autoReveal = data.enabled;
     emit();
   });
 

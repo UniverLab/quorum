@@ -391,3 +391,63 @@ describe('protocol — stories list', () => {
     expect(s.stories).toEqual(['Remote A', 'Remote B']);
   });
 });
+
+// ── Payload validation (untrusted peers) ────────────────────────────────────────
+
+describe('protocol — payload validation', () => {
+  let proto, updates;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ proto, updates } = await makeProtocol('u1', 'Alice'));
+    vi.advanceTimersByTime(1);
+  });
+
+  afterEach(() => { proto.destroy(); vi.useRealTimers(); });
+
+  it('ignores a join with no participant', () => {
+    mockRoom.triggerAction('join', {}, 'peer-x');
+    mockRoom.triggerAction('join', { participant: { name: 'NoId' } }, 'peer-y');
+    const ids = Object.keys(latest(updates).participants);
+    expect(ids).toEqual(['u1']);
+  });
+
+  it('strips peer-controlled fields from a join, keeping only id and name', () => {
+    mockRoom.triggerAction('join', {
+      participant: { id: 'u2', name: 'Bob', online: false, lastSeen: 0, evil: true },
+    }, 'peer-u2');
+    const p = latest(updates).participants['u2'];
+    expect(p).toEqual({ id: 'u2', name: 'Bob', lastSeen: expect.any(Number), online: true });
+    expect(p.evil).toBeUndefined();
+  });
+
+  it('ignores a vote from an unknown participant', () => {
+    proto.startVoting('Story');
+    const roundId = latest(updates).roundId;
+    mockRoom.triggerAction('vote', { participantId: 'ghost', card: '13', roundId }, 'peer-z');
+    expect(latest(updates).votes['ghost']).toBeUndefined();
+  });
+
+  it('ignores a state-sync without participants/votes objects', () => {
+    mockRoom.triggerAction('state-sync', { state: { phase: 'revealed' } });
+    expect(latest(updates).phase).not.toBe('revealed');
+  });
+
+  it('ignores stories-load when stories is not an array', () => {
+    proto.loadStories('A\nB');
+    mockRoom.triggerAction('stories-load', { stories: 'not-an-array' });
+    expect(latest(updates).stories).toEqual(['A', 'B']);
+  });
+
+  it('filters non-string entries out of an incoming stories list', () => {
+    mockRoom.triggerAction('stories-load', { stories: ['ok', 42, null, 'fine'] });
+    expect(latest(updates).stories).toEqual(['ok', 'fine']);
+  });
+
+  it('ignores auto-reveal toggle that is not a boolean', () => {
+    const before = latest(updates).autoReveal;
+    mockRoom.triggerAction('auto-reveal', { enabled: 'yes' });
+    expect(latest(updates).autoReveal).toBe(before);
+  });
+});
