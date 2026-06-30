@@ -1,0 +1,270 @@
+import { joinRoom } from 'trystero/torrent';
+import { createInitialState, getAllVoted } from './state.js';
+
+const APP_ID         = 'quorum-univerlab-v1';
+const HEARTBEAT_MS   = 5_000;
+const PEER_TIMEOUT_MS = 15_000;
+
+/**
+ * @param {string} roomId
+ * @param {string} userId
+ * @param {string} userName
+ * @param {(state: object) => void} onUpdate
+ * @param {() => void} onCountdown  called when auto-reveal triggers (3 s before revealed)
+ */
+export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) {
+  let state = createInitialState(roomId);
+  let revealPending = false;
+  let hbTimer = null;
+
+  const self = { id: userId, name: userName, lastSeen: Date.now(), online: true };
+  state.participants[userId] = self;
+  state.votes[userId] = null;
+
+  const room = joinRoom({ appId: APP_ID }, roomId);
+
+  const [sendJoin,         getJoin]         = room.makeAction('join');
+  const [sendStateSync,    getStateSync]    = room.makeAction('state-sync');
+  const [sendVote,         getVote]         = room.makeAction('vote');
+  const [sendReveal,       getReveal]       = room.makeAction('reveal');
+  const [sendNextRound,    getNextRound]    = room.makeAction('next-round');
+  const [sendNewStory,     getNewStory]     = room.makeAction('new-story');
+  const [sendStoriesLoad,  getStoriesLoad]  = room.makeAction('stories-load');
+  const [sendAutoReveal,   getAutoReveal]   = room.makeAction('auto-reveal');
+  const [sendLeave,        getLeave]        = room.makeAction('leave');
+  const [sendHeartbeat,    getHeartbeat]    = room.makeAction('heartbeat');
+
+  // Maps Trystero peer ID → app-level userId
+  const peerMap = new Map();
+
+  function snapshot() {
+    return {
+      ...state,
+      participants: { ...state.participants },
+      votes: { ...state.votes },
+    };
+  }
+
+  function emit() { onUpdate(snapshot()); }
+
+  function initVotes() {
+    const v = {};
+    Object.keys(state.participants).forEach(id => { v[id] = state.votes[id] ?? null; });
+    state.votes = v;
+  }
+
+  function triggerReveal() {
+    if (revealPending) return;
+    revealPending = true;
+    onCountdown?.();
+    setTimeout(() => {
+      state.phase = 'revealed';
+      revealPending = false;
+      emit();
+    }, 3_000);
+  }
+
+  function checkAutoReveal() {
+    if (state.autoReveal && state.phase === 'voting' && getAllVoted(state)) {
+      sendReveal({ roundId: state.roundId });
+      triggerReveal();
+    }
+  }
+
+  // ── Trystero peer lifecycle ───────────────────────────────────────────────
+
+  room.onPeerJoin((peerId) => {
+    // Send current state directly to the new peer
+    sendStateSync({ state: snapshot() }, peerId);
+  });
+
+  room.onPeerLeave((peerId) => {
+    const uid = peerMap.get(peerId);
+    if (uid && state.participants[uid]) {
+      state.participants[uid] = { ...state.participants[uid], online: false };
+      peerMap.delete(peerId);
+      emit();
+    }
+  });
+
+  // ── Incoming events ───────────────────────────────────────────────────────
+
+  getJoin((data, peerId) => {
+    const p = data.participant;
+    peerMap.set(peerId, p.id);
+    state.participants[p.id] = { ...p, lastSeen: Date.now(), online: true };
+    if (state.votes[p.id] === undefined) state.votes[p.id] = null;
+    emit();
+    // Respond directly to the joiner with latest state
+    sendStateSync({ state: snapshot() }, peerId);
+  });
+
+  getStateSync((data) => {
+    // Only apply if we have no other known peers yet (fresh joiner)
+    const knownOthers = Object.keys(state.participants).filter(id => id !== userId);
+    if (knownOthers.length > 0) return;
+
+    const incoming = data.state;
+    state = { ...incoming };
+    // Re-assert self
+    state.participants[userId] = { ...self, lastSeen: Date.now(), online: true };
+    if (state.votes[userId] === undefined) state.votes[userId] = null;
+    revealPending = false;
+    emit();
+  });
+
+  getVote(({ participantId, card, roundId }) => {
+    if (roundId !== state.roundId) return;
+    state.votes[participantId] = card;
+    emit();
+    checkAutoReveal();
+  });
+
+  getReveal(({ roundId }) => {
+    if (roundId !== state.roundId || state.phase !== 'voting') return;
+    triggerReveal();
+  });
+
+  getNextRound(({ roundId }) => {
+    state.roundId = roundId;
+    state.phase = 'voting';
+    revealPending = false;
+    initVotes();
+    emit();
+  });
+
+  getNewStory(({ index, title, roundId }) => {
+    state.roundId = roundId;
+    state.currentIndex = index;
+    state.storyTitle = title;
+    state.phase = 'voting';
+    revealPending = false;
+    initVotes();
+    emit();
+  });
+
+  getStoriesLoad(({ stories }) => {
+    state.stories = stories;
+    state.currentIndex = -1;
+    emit();
+  });
+
+  getAutoReveal(({ enabled }) => {
+    state.autoReveal = enabled;
+    emit();
+  });
+
+  getLeave(({ participantId }) => {
+    if (state.participants[participantId]) {
+      state.participants[participantId] = { ...state.participants[participantId], online: false };
+      emit();
+    }
+  });
+
+  getHeartbeat(({ participantId }) => {
+    if (state.participants[participantId]) {
+      state.participants[participantId].lastSeen = Date.now();
+      state.participants[participantId].online = true;
+    }
+  });
+
+  // ── Heartbeat loop ────────────────────────────────────────────────────────
+
+  hbTimer = setInterval(() => {
+    sendHeartbeat({ participantId: userId });
+    state.participants[userId].lastSeen = Date.now();
+
+    const now = Date.now();
+    let changed = false;
+    Object.values(state.participants).forEach(p => {
+      if (p.id === userId) return;
+      const wasOnline = p.online !== false;
+      const nowOnline = now - p.lastSeen <= PEER_TIMEOUT_MS;
+      if (wasOnline !== nowOnline) {
+        state.participants[p.id] = { ...p, online: nowOnline };
+        changed = true;
+      }
+    });
+    if (changed) emit();
+  }, HEARTBEAT_MS);
+
+  // Announce presence (deferred so caller can assign protocol ref first)
+  setTimeout(() => {
+    sendJoin({ participant: self });
+    emit();
+  }, 0);
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  return {
+    getState: () => snapshot(),
+
+    startVoting(title) {
+      const newRoundId = crypto.randomUUID();
+      state.storyTitle = title;
+      state.phase = 'voting';
+      state.roundId = newRoundId;
+      revealPending = false;
+      initVotes();
+      sendNewStory({ index: state.currentIndex, title, roundId: newRoundId });
+      emit();
+    },
+
+    vote(card) {
+      if (state.phase !== 'voting') return;
+      state.votes[userId] = card;
+      sendVote({ participantId: userId, card, roundId: state.roundId });
+      emit();
+      checkAutoReveal();
+    },
+
+    reveal() {
+      if (state.phase !== 'voting' || revealPending) return;
+      sendReveal({ roundId: state.roundId });
+      triggerReveal();
+    },
+
+    nextRound() {
+      const newRoundId = crypto.randomUUID();
+      state.roundId = newRoundId;
+      state.phase = 'voting';
+      revealPending = false;
+      initVotes();
+      sendNextRound({ roundId: newRoundId });
+      emit();
+    },
+
+    newStory() {
+      const newIndex = state.currentIndex < 0 ? 0 : state.currentIndex + 1;
+      const title = state.stories[newIndex] ?? '';
+      const newRoundId = crypto.randomUUID();
+      state.roundId = newRoundId;
+      state.currentIndex = newIndex;
+      state.storyTitle = title;
+      state.phase = 'waiting';
+      revealPending = false;
+      initVotes();
+      sendNewStory({ index: newIndex, title, roundId: newRoundId });
+      emit();
+    },
+
+    loadStories(text) {
+      const stories = text.split('\n').map(s => s.trim()).filter(Boolean);
+      state.stories = stories;
+      state.currentIndex = -1;
+      sendStoriesLoad({ stories });
+      emit();
+    },
+
+    setAutoReveal(enabled) {
+      state.autoReveal = enabled;
+      sendAutoReveal({ enabled });
+      emit();
+    },
+
+    destroy() {
+      clearInterval(hbTimer);
+      sendLeave({ participantId: userId });
+    },
+  };
+}
