@@ -20,6 +20,7 @@ vi.mock('trystero/torrent', () => ({
       },
       onPeerJoin(cb)  { peerJoinCbs.push(cb); },
       onPeerLeave(cb) { peerLeaveCbs.push(cb); },
+      leave: vi.fn(),
       triggerPeerJoin(peerId)         { peerJoinCbs.forEach(cb => cb(peerId)); },
       triggerPeerLeave(peerId)        { peerLeaveCbs.forEach(cb => cb(peerId)); },
       triggerAction(name, data, peer) { (gets[name] || []).forEach(cb => cb(data, peer || 'px')); },

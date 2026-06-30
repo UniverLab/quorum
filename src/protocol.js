@@ -279,6 +279,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       cancelReveal();
       clearInterval(hbTimer);
       sendLeave({ participantId: userId });
+      // Tear down the Trystero room: close peer connections and detach all
+      // onPeerJoin/getX listeners. Without this they leak on SPA navigation.
+      room.leave();
     },
   };
 }
