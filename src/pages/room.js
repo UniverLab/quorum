@@ -1,6 +1,7 @@
 import { createProtocol } from '../protocol.js';
 import { getUserId, getUserName, setUserName } from '../identity.js';
 import { computeStats } from '../state.js';
+import { setCleanup } from '../router.js';
 
 const DECK = ['1', '2', '3', '5', '8', '13', '21', '?', '☕'];
 
@@ -112,6 +113,7 @@ function startRoom(root, roomId, userId, userName) {
   }
 
   protocol = createProtocol(roomId, userId, userName, onUpdate, onCountdown);
+  setCleanup(() => protocol.destroy());
 }
 
 // ── Phase: waiting ────────────────────────────────────────────────────────────
