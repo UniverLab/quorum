@@ -1,0 +1,43 @@
+name: Release
+
+# Mirrors the org's Rust release pattern: fires when a PR into main that
+# touched package.json is merged. Branches are protected, so this is how code
+# reaches main — no direct pushes. Tags are created here, never by hand.
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize releases — never cancel mid-flight, but don't let two race on the tag.
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag release from package.json version
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag if version is new
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if git rev-parse "$version" >/dev/null 2>&1; then
+            echo "Tag $version already exists — nothing to release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$version" -m "Release $version"
+          git push origin "$version"
+          echo "Created and pushed tag $version."

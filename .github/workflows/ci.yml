@@ -1,13 +1,21 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop, 'feature/**', 'fix/**']
   pull_request:
-    branches: [develop, main]
+  workflow_dispatch:
+
+# CI only reads the checkout — least privilege.
+permissions:
+  contents: read
+
+# A newer push to the same PR supersedes in-flight CI; cancel the stale run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Test & Coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -21,31 +29,3 @@ jobs:
       - run: npm ci
 
       - run: npm run coverage
-
-  # Tags are created here, not by hand: once main is green, tag v<version>
-  # from package.json. Idempotent — skips if the tag already exists, so a push
-  # to main without a version bump is a no-op. Bump package.json to release.
-  release:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Tag release from package.json version
-        run: |
-          version="v$(node -p "require('./package.json').version")"
-          if git rev-parse "$version" >/dev/null 2>&1; then
-            echo "Tag $version already exists — nothing to release."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$version" -m "Release $version"
-          git push origin "$version"
-          echo "Created and pushed tag $version."
