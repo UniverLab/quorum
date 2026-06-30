@@ -48,9 +48,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
   function emit() { onUpdate(snapshot()); }
 
-  function initVotes() {
+  function clearVotes() {
     const v = {};
-    Object.keys(state.participants).forEach(id => { v[id] = state.votes[id] ?? null; });
+    Object.keys(state.participants).forEach(id => { v[id] = null; });
     state.votes = v;
   }
 
@@ -137,7 +137,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     cancelReveal();
     state.roundId = roundId;
     state.phase = 'voting';
-    initVotes();
+    clearVotes();
     emit();
   });
 
@@ -147,7 +147,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     state.currentIndex = index;
     state.storyTitle = title;
     state.phase = 'voting';
-    initVotes();
+    clearVotes();
     emit();
   });
 
@@ -171,8 +171,13 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
   getHeartbeat(({ participantId }) => {
     if (state.participants[participantId]) {
-      state.participants[participantId].lastSeen = Date.now();
-      state.participants[participantId].online = true;
+      const wasOnline = state.participants[participantId].online !== false;
+      state.participants[participantId] = {
+        ...state.participants[participantId],
+        lastSeen: Date.now(),
+        online: true,
+      };
+      if (!wasOnline) emit();
     }
   });
 
@@ -213,7 +218,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.phase = 'voting';
       state.roundId = newRoundId;
       revealPending = false;
-      initVotes();
+      clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId });
       emit();
     },
@@ -237,7 +242,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       cancelReveal();
       state.roundId = newRoundId;
       state.phase = 'voting';
-      initVotes();
+      clearVotes();
       sendNextRound({ roundId: newRoundId });
       emit();
     },
@@ -251,7 +256,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.currentIndex = newIndex;
       state.storyTitle = title;
       state.phase = 'waiting';
-      initVotes();
+      clearVotes();
       sendNewStory({ index: newIndex, title, roundId: newRoundId });
       emit();
     },
