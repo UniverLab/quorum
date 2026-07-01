@@ -2,15 +2,17 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Espresso by default — the card table under a lamp, matching the landing:
+   warm dark-brown ground, cream ink, amber cards. */
 :root {
-  --bg:          #faf6ee;
-  --bg-surface:  #f0e8d4;
-  --ink:         #2c1e08;
-  --ink-dim:     #7a5c2a;
-  --ink-faint:   #b09870;
-  --line:        #d4c4a0;
-  --accent:      #f5c842;
-  --accent-dim:  rgba(245, 200, 66, 0.18);
+  --bg:          #241a12;
+  --bg-surface:  #2f2318;
+  --ink:         #f2e7d3;
+  --ink-dim:     #b8a583;
+  --ink-faint:   #8a7a5e;
+  --line:        #40331f;
+  --accent:      #e6b24a;
+  --accent-dim:  rgba(230, 178, 74, 0.18);
   --danger:      #c0392b;
   --radius:      4px;
 
@@ -18,17 +20,6 @@
   font-size: 16px;
   color: var(--ink);
   background: var(--bg);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:         #18130a;
-    --bg-surface: #231a0e;
-    --ink:        #f0e8d0;
-    --ink-dim:    #a8896a;
-    --ink-faint:  #6b5238;
-    --line:       #3d2e18;
-  }
 }
 
 body { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -87,16 +78,20 @@ button:active { opacity: 0.7; }
 .modal-room { font-size: 0.82rem; color: var(--ink-dim); }
 .mono { font-family: monospace; letter-spacing: 0.06em; }
 
-.modal input {
-  width: 100%;
+.modal input,
+.join input {
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--line);
-  background: var(--bg);
+  background: var(--bg-surface);
   color: var(--ink);
   border-radius: var(--radius);
   font-size: 1rem;
 }
-.modal input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.modal input { width: 100%; }
+.modal input::placeholder,
+.join input::placeholder { color: var(--ink-faint); }
+.modal input:focus,
+.join input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ── Room shell ─────────────────────────────────────────────────────────── */
 
