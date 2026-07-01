@@ -2,6 +2,7 @@
   "name": "@univerlab/quorum",
   "version": "0.1.0",
   "description": "Browser-native planning poker — P2P, no accounts, no server",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
