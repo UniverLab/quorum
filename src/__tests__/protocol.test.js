@@ -247,6 +247,35 @@ describe('protocol — round management', () => {
     expect(latest(updates).phase).toBe('waiting');
   });
 
+  it('newStory broadcasts phase waiting so peers land in the same screen', () => {
+    proto.loadStories('Story A\nStory B');
+    proto.newStory();
+    expect(mockRoom.getSend('new-story')).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'waiting', title: 'Story A', index: 0 }),
+    );
+  });
+
+  it('startVoting broadcasts phase voting', () => {
+    proto.startVoting('Story');
+    expect(mockRoom.getSend('new-story')).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'voting', title: 'Story' }),
+    );
+  });
+
+  it('incoming new-story applies the phase carried by the message', () => {
+    mockRoom.triggerAction('new-story', { index: 0, title: 'Remote', roundId: 'r1', phase: 'waiting' });
+    expect(latest(updates).phase).toBe('waiting');
+    expect(latest(updates).storyTitle).toBe('Remote');
+
+    mockRoom.triggerAction('new-story', { index: 0, title: 'Remote', roundId: 'r2', phase: 'voting' });
+    expect(latest(updates).phase).toBe('voting');
+  });
+
+  it('incoming new-story without phase defaults to voting', () => {
+    mockRoom.triggerAction('new-story', { index: 0, title: 'Old client', roundId: 'r3' });
+    expect(latest(updates).phase).toBe('voting');
+  });
+
   it('setAutoReveal broadcasts auto-reveal event', () => {
     proto.setAutoReveal(false);
     expect(mockRoom.getSend('auto-reveal')).toHaveBeenCalledWith({ enabled: false });
@@ -443,6 +472,24 @@ describe('protocol — payload validation', () => {
   it('filters non-string entries out of an incoming stories list', () => {
     mockRoom.triggerAction('stories-load', { stories: ['ok', 42, null, 'fine'] });
     expect(latest(updates).stories).toEqual(['ok', 'fine']);
+  });
+
+  it('does not throw on null or malformed payloads in any handler', () => {
+    const actions = ['join', 'state-sync', 'vote', 'reveal', 'next-round', 'new-story', 'stories-load', 'auto-reveal', 'leave', 'heartbeat'];
+    for (const name of actions) {
+      expect(() => mockRoom.triggerAction(name, null, 'peer-x'), name).not.toThrow();
+      expect(() => mockRoom.triggerAction(name, 'garbage', 'peer-x'), name).not.toThrow();
+    }
+    expect(latest(updates).participants['u1']).toBeDefined();
+  });
+
+  it('ignores next-round and new-story without a string roundId', () => {
+    proto.startVoting('Story');
+    const before = latest(updates).roundId;
+    mockRoom.triggerAction('next-round', { roundId: 42 });
+    mockRoom.triggerAction('new-story', { roundId: null, title: 'X', index: 0 });
+    expect(latest(updates).roundId).toBe(before);
+    expect(latest(updates).phase).toBe('voting');
   });
 
   it('ignores auto-reveal toggle that is not a boolean', () => {
