@@ -5,25 +5,56 @@
 /* Espresso by default — the card table under a lamp, matching the landing:
    warm dark-brown ground, cream ink, amber cards. */
 :root {
-  --bg:          #241a12;
-  --bg-surface:  #2f2318;
+  --bg:          #1a120c;
+  --bg-surface:  #241a12;
+  --bg-raise:    #2f2318;
   --ink:         #f2e7d3;
   --ink-dim:     #b8a583;
   --ink-faint:   #8a7a5e;
-  --line:        #40331f;
+  --line:        #352a1f;
   --accent:      #e6b24a;
   --accent-dim:  rgba(230, 178, 74, 0.18);
   --danger:      #c0392b;
-  --radius:      4px;
+  --radius:      6px;
 
-  font-family: system-ui, -apple-system, sans-serif;
+  /* Typography — matching landing page */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-body: -apple-system, 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  font-family: var(--font-body);
   font-size: 16px;
   color: var(--ink);
   background: var(--bg);
 }
 
-body { min-height: 100dvh; display: flex; flex-direction: column; }
+/* Arena theme — light sand for daytime (circadian) */
+html[data-theme='arena'] {
+  --bg: #f0e8da;
+  --bg-surface: #f7f2e8;
+  --bg-raise: #faf6ee;
+  --ink: #3a2a1a;
+  --ink-dim: #7a6a52;
+  --ink-faint: #a89878;
+  --line: #ddd2c0;
+  --accent: #c4922a;
+  --accent-dim: rgba(196, 146, 42, 0.15);
+}
+
+html {
+  transition: background-color 0.5s ease, color 0.3s ease;
+}
+html[data-theme] {
+  transition: background-color 0.5s ease, color 0.3s ease;
+}
+
+body { min-height: 100dvh; display: flex; flex-direction: column; transition: background-color 0.5s ease; }
 #app { flex: 1; display: flex; flex-direction: column; }
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+
+h1, h2, h3 { font-family: var(--font-display); }
+.mono { font-family: var(--font-mono); letter-spacing: 0.06em; }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 
@@ -50,7 +81,242 @@ button:active { opacity: 0.7; }
 }
 .btn-ghost:hover { border-color: var(--ink-dim); color: var(--ink); }
 
+.btn-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .hidden { display: none !important; }
+
+/* ── Logo link ────────────────────────────────────────────────────────────── */
+
+.room-logo-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--ink);
+  transition: opacity 0.2s;
+}
+.room-logo-link:hover { opacity: 0.8; }
+
+.room-logo-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Leave button ─────────────────────────────────────────────────────────── */
+
+.btn-leave {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.9rem;
+}
+.btn-leave:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn-theme {
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  font-size: 1rem;
+  padding: 0.3rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.btn-theme:hover {
+  color: var(--accent);
+}
+
+/* ── Stories section ─────────────────────────────────────────────────────── */
+
+.stories-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.stories-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.story-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.story-textarea {
+  width: 100%;
+  padding: 0.65rem 2.5rem 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  background: var(--bg-surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  border-radius: var(--radius);
+  resize: vertical;
+  min-height: 4rem;
+}
+.story-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.story-textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.stories-input-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-add {
+  position: absolute;
+  right: 0.4rem;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 2rem;
+  padding: 0;
+  font-size: 1.1rem;
+  font-weight: 400;
+  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-action {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-action:hover {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
+
+.btn-start {
+  padding: 0.6rem 1.5rem;
+  font-size: 0.95rem;
+}
+
+.btn-back {
+  margin-left: auto;
+}
+
+/* ── Stories list ────────────────────────────────────────────────────────── */
+
+.stories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.stories-empty {
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  padding: 1rem;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.story-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: all 0.2s;
+  cursor: grab;
+}
+.story-item:active {
+  cursor: grabbing;
+}
+.story-item.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.story-item.dragging {
+  opacity: 0.5;
+  border-style: dashed;
+  background: var(--accent-dim);
+}
+
+.story-item.drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.story-drag {
+  color: var(--ink-faint);
+  cursor: grab;
+  font-size: 0.9rem;
+  user-select: none;
+  pointer-events: none;
+}
+
+.story-num {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  min-width: 1.5rem;
+}
+
+.story-text {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.story-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--accent);
+  color: #18130a;
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.story-delete {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 0.85rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: all 0.15s;
+}
+.story-delete:hover {
+  color: var(--danger);
+  background: rgba(192, 57, 43, 0.1);
+}
 
 /* ── Modal ──────────────────────────────────────────────────────────────── */
 
@@ -76,7 +342,6 @@ button:active { opacity: 0.7; }
 
 .modal h2 { font-size: 1.3rem; }
 .modal-room { font-size: 0.82rem; color: var(--ink-dim); }
-.mono { font-family: monospace; letter-spacing: 0.06em; }
 
 .modal input,
 .join input {
@@ -93,6 +358,109 @@ button:active { opacity: 0.7; }
 .modal input:focus,
 .join input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* ── Home page ───────────────────────────────────────────────────────────── */
+
+.page.home {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+}
+
+.home-theme {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.home-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+  max-width: 28rem;
+  width: 100%;
+}
+
+.home-brand {
+  text-align: center;
+}
+
+.home-banner {
+  font-family: var(--font-mono);
+  font-size: clamp(0.45rem, 1.2vw, 0.7rem);
+  line-height: 1.1;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
+  white-space: pre;
+  text-align: center;
+}
+
+/* Banner always dark — ignore arena theme */
+html[data-theme='arena'] .home-banner {
+  color: #c4922a;
+}
+html[data-theme='arena'] .home {
+  background: var(--bg);
+}
+
+.home-subtitle {
+  font-size: 1.1rem;
+  color: var(--ink-dim);
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #18130a;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(230, 178, 74, 0.3);
+}
+
+.join {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 20rem;
+}
+
+.join-input {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  background: var(--bg-surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  border-radius: var(--radius);
+}
+
+.join-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.join-input::placeholder {
+  color: var(--ink-faint);
+}
+
 /* ── Room shell ─────────────────────────────────────────────────────────── */
 
 .room { display: flex; flex-direction: column; min-height: 100dvh; }
@@ -100,40 +468,62 @@ button:active { opacity: 0.7; }
 .room-header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg-surface);
+  backdrop-filter: blur(8px);
 }
 
-.room-logo { font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
+.room-logo {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
 
 .room-code {
-  font-family: monospace;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   background: transparent;
   border: 1px solid var(--line);
   color: var(--ink-dim);
-  padding: 0.2rem 0.55rem;
-  font-weight: 400;
+  padding: 0.25rem 0.6rem;
+  font-weight: 500;
   border-radius: var(--radius);
+  transition: all 0.2s;
 }
 .room-code:hover { color: var(--accent); border-color: var(--accent); }
 
+.room-code-hint {
+  font-size: 0.6rem;
+  color: var(--ink-faint);
+  margin-left: 0.3rem;
+  font-weight: 400;
+  text-transform: lowercase;
+}
+
 .conn-dot {
-  width: 7px; height: 7px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--line);
   flex-shrink: 0;
+  transition: background 0.3s;
 }
-.conn-dot.on    { background: #5dd39e; }
-.conn-dot.alone { background: var(--accent); }
+.conn-dot.on    { background: #5dd39e; box-shadow: 0 0 8px rgba(93, 211, 158, 0.5); }
+.conn-dot.alone { background: var(--accent); box-shadow: 0 0 8px rgba(230, 178, 74, 0.5); }
 
-.conn-label { font-size: 0.78rem; color: var(--ink-dim); }
+.conn-label { font-size: 0.8rem; color: var(--ink-dim); }
 
-.room-main { flex: 1; padding: 1.5rem; max-width: 52rem; margin: 0 auto; width: 100%; }
+.room-main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 56rem;
+  margin: 0 auto;
+  width: 100%;
+}
 
 /* ── Waiting phase ──────────────────────────────────────────────────────── */
 
@@ -152,7 +542,7 @@ button:active { opacity: 0.7; }
 
 .queue-info { font-size: 0.82rem; color: var(--ink-dim); }
 
-.waiting-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.waiting-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }
 
 .load-panel {
   background: var(--bg-surface);
@@ -170,7 +560,7 @@ button:active { opacity: 0.7; }
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--ink);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.88rem;
   border-radius: var(--radius);
   resize: vertical;
@@ -208,6 +598,34 @@ button:active { opacity: 0.7; }
   line-height: 1.3;
 }
 
+.story-title.md {
+  font-style: normal;
+}
+.story-title.md h1,
+.story-title.md h2,
+.story-title.md h3 {
+  font-family: var(--font-display);
+  font-style: normal;
+  margin: 0;
+}
+.story-title.md code {
+  font-family: var(--font-mono);
+  background: var(--accent-dim);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.story-title.md strong {
+  color: var(--accent);
+}
+.story-title.md ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+.story-title.md li {
+  margin: 0.25rem 0;
+}
+
 .vote-progress { font-size: 0.8rem; color: var(--ink-dim); }
 
 .participant-cards {
@@ -220,23 +638,29 @@ button:active { opacity: 0.7; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .pcard-face {
-  width: 3rem; height: 4rem;
+  width: 3.2rem; height: 4.2rem;
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg-surface);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.2s, background 0.2s;
+  transition: all 0.25s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* Pattern for face-down card */
 .pcard-face::before {
   content: '';
   position: absolute;
@@ -249,17 +673,32 @@ button:active { opacity: 0.7; }
     transparent 50%
   );
   background-size: 8px 8px;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .pcard.voted .pcard-face {
   border-color: var(--accent);
   background: var(--accent-dim);
+  box-shadow: 0 8px 20px rgba(230, 178, 74, 0.25);
 }
 .pcard.voted .pcard-face::before { display: none; }
 
-.pcard-check { font-size: 1.1rem; color: var(--accent); position: relative; z-index: 1; }
-.pcard-name { font-size: 0.72rem; color: var(--ink-dim); max-width: 4rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard-check {
+  font-size: 1.2rem;
+  color: var(--accent);
+  position: relative;
+  z-index: 1;
+}
+.pcard-name {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--ink-dim);
+  max-width: 4.5rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pcard.offline { opacity: 0.4; }
 
 /* Auto-reveal row */
@@ -312,28 +751,37 @@ button:active { opacity: 0.7; }
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  justify-content: center;
 }
 
 .card {
-  width: 3.2rem; height: 4.4rem;
-  font-size: 1rem;
-  font-weight: 700;
+  width: 3.4rem; height: 4.6rem;
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
   background: var(--bg-surface);
   color: var(--ink);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   padding: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
-.card:hover { border-color: var(--accent); color: var(--ink); }
+.card:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
 .card.selected {
   background: var(--accent);
   border-color: var(--accent);
   color: #18130a;
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(245, 200, 66, 0.3);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(230, 178, 74, 0.35);
 }
 
-/* ── Countdown screen ───────────────────────────────────────────────────── */
+/* ── Poker countdown ──────────────────────────────────────────────────────── */
 
 .countdown-screen {
   display: flex;
@@ -345,32 +793,170 @@ button:active { opacity: 0.7; }
   text-align: center;
 }
 
-.countdown-wrap {
-  width: 7rem; height: 7rem;
-  border-radius: 50%;
-  background: var(--accent-dim);
-  border: 2px solid var(--accent);
+.poker-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.poker-card {
+  width: 6rem;
+  height: 8.4rem;
+  perspective: 600px;
+  position: relative;
+}
+
+.poker-front,
+.poker-back {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: pulse 1s ease-in-out infinite;
+  font-size: 4rem;
+  border-radius: 8px;
+  backface-visibility: hidden;
+  transition: transform 0.4s ease;
 }
 
-.countdown-num {
-  font-size: 3rem;
+.poker-front {
+  background: var(--bg-surface);
+  border: 2px solid var(--line);
+}
+
+.poker-back {
+  background: var(--bg-surface);
+  border: 2px solid var(--accent);
+  transform: rotateY(180deg);
+}
+
+.poker-card.flipped .poker-front {
+  transform: rotateY(-180deg);
+}
+.poker-card.flipped .poker-back {
+  transform: rotateY(0);
+}
+
+.countdown-label {
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--accent);
-  font-family: monospace;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.06); }
+  font-family: var(--font-mono);
+  margin: 0;
 }
 
 /* ── Revealed phase ─────────────────────────────────────────────────────── */
 
 .revealed { display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* ── Reveal animation overlay ──────────────────────────────────────────── */
+
+.reveal-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 2rem;
+  pointer-events: none;
+}
+
+.reveal-title {
+  opacity: 0;
+  animation: fadeInSoft 0.6s ease-out forwards;
+  animation-delay: 0.3s;
+}
+
+@keyframes fadeInSoft {
+  to { opacity: 1; }
+}
+
+.reveal-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  perspective: 800px;
+}
+
+/* Individual reveal card — starts spread out, slides to center */
+.reveal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0;
+  /* Start at spread position */
+  transform: translate(var(--sx, 0px), var(--sy, -60px)) scale(0.7);
+  transition: none;
+  will-change: transform, opacity;
+}
+
+.reveal-card.slide-to-center {
+  opacity: 1;
+  transform: translate(0, 0) scale(1);
+  transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease-out;
+}
+
+.reveal-card-inner {
+  width: 3.8rem;
+  height: 5rem;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.reveal-card-face {
+  backface-visibility: hidden;
+}
+
+.reveal-card-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  transform: rotateY(180deg);
+  color: var(--accent);
+}
+
+.reveal-card.flipping .reveal-card-inner {
+  transform: rotateY(180deg);
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(230, 178, 74, 0.35);
+}
+
+.reveal-card-name {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--ink-dim);
+  max-width: 4.5rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Vibration is now JS-controlled via inline transform — no CSS animation needed */
+
+.reveal-card.offline .reveal-card-inner {
+  border-color: var(--line);
+  opacity: 0.5;
+}
 
 .revealed-cards {
   display: flex;
@@ -396,7 +982,7 @@ button:active { opacity: 0.7; }
   justify-content: center;
   font-size: 1.3rem;
   font-weight: 700;
-  font-family: monospace;
+  font-family: var(--font-mono);
   color: var(--ink);
 }
 
@@ -420,7 +1006,7 @@ button:active { opacity: 0.7; }
   gap: 0.15rem;
 }
 .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); }
-.stat strong { font-size: 1.4rem; font-family: monospace; color: var(--ink); }
+.stat strong { font-size: 1.4rem; font-family: var(--font-mono); color: var(--ink); }
 
 .revealed-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
@@ -432,4 +1018,15 @@ button:active { opacity: 0.7; }
   .room-main { padding: 1rem; }
   .deck { gap: 0.35rem; }
   .card { width: 2.8rem; height: 4rem; font-size: 0.9rem; }
+}
+
+/* ── Background animation ────────────────────────────────────────────────── */
+
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
 }

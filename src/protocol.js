@@ -63,13 +63,15 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   function triggerReveal() {
     if (revealPending) return;
     revealPending = true;
-    onCountdown?.();
+    const result = onCountdown?.();
+    // If onCountdown returns a number (animation duration ms), use it; else 3s fallback
+    const animDuration = typeof result === 'number' ? result : 3_000;
     revealTimeout = setTimeout(() => {
       revealTimeout = null;
       state.phase = 'revealed';
       revealPending = false;
       emit();
-    }, 3_000);
+    }, animDuration);
   }
 
   function checkAutoReveal() {
@@ -141,25 +143,31 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     checkAutoReveal();
   });
 
-  getReveal(({ roundId }) => {
-    if (roundId !== state.roundId || state.phase !== 'voting') return;
+  getReveal((data) => {
+    if (!isObj(data)) return;
+    if (data.roundId !== state.roundId || state.phase !== 'voting') return;
     triggerReveal();
   });
 
-  getNextRound(({ roundId }) => {
+  getNextRound((data) => {
+    if (!isObj(data) || typeof data.roundId !== 'string') return;
     cancelReveal();
-    state.roundId = roundId;
+    state.roundId = data.roundId;
     state.phase = 'voting';
     clearVotes();
     emit();
   });
 
-  getNewStory(({ index, title, roundId }) => {
+  getNewStory((data) => {
+    if (!isObj(data) || typeof data.roundId !== 'string') return;
     cancelReveal();
-    state.roundId = roundId;
-    state.currentIndex = index;
-    state.storyTitle = title;
-    state.phase = 'voting';
+    state.roundId = data.roundId;
+    state.currentIndex = typeof data.index === 'number' ? data.index : -1;
+    state.storyTitle = typeof data.title === 'string' ? data.title : '';
+    // Mirror the sender's phase: startVoting broadcasts 'voting', newStory
+    // broadcasts 'waiting'. Without this every receiver jumped straight into
+    // voting while the sender of newStory sat in the waiting screen.
+    state.phase = data.phase === 'waiting' ? 'waiting' : 'voting';
     clearVotes();
     emit();
   });
@@ -178,14 +186,18 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     emit();
   });
 
-  getLeave(({ participantId }) => {
+  getLeave((data) => {
+    if (!isObj(data)) return;
+    const { participantId } = data;
     if (state.participants[participantId]) {
       state.participants[participantId] = { ...state.participants[participantId], online: false };
       emit();
     }
   });
 
-  getHeartbeat(({ participantId }) => {
+  getHeartbeat((data) => {
+    if (!isObj(data)) return;
+    const { participantId } = data;
     if (state.participants[participantId]) {
       const wasOnline = state.participants[participantId].online !== false;
       state.participants[participantId] = {
@@ -235,7 +247,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.roundId = newRoundId;
       revealPending = false;
       clearVotes();
-      sendNewStory({ index: state.currentIndex, title, roundId: newRoundId });
+      sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
       emit();
     },
 
@@ -273,7 +285,22 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.storyTitle = title;
       state.phase = 'waiting';
       clearVotes();
-      sendNewStory({ index: newIndex, title, roundId: newRoundId });
+      sendNewStory({ index: newIndex, title, roundId: newRoundId, phase: 'waiting' });
+      emit();
+    },
+
+    nextStory() {
+      const newIndex = state.currentIndex + 1;
+      if (newIndex >= state.stories.length) return;
+      const title = state.stories[newIndex];
+      const newRoundId = crypto.randomUUID();
+      cancelReveal();
+      state.roundId = newRoundId;
+      state.currentIndex = newIndex;
+      state.storyTitle = title;
+      state.phase = 'voting';
+      clearVotes();
+      sendNewStory({ index: newIndex, title, roundId: newRoundId, phase: 'voting' });
       emit();
     },
 
@@ -288,6 +315,14 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     setAutoReveal(enabled) {
       state.autoReveal = enabled;
       sendAutoReveal({ enabled });
+      emit();
+    },
+
+    backToWaiting() {
+      cancelReveal();
+      state.phase = 'waiting';
+      state.storyTitle = '';
+      state.votes = {};
       emit();
     },
 

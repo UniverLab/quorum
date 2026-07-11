@@ -2,6 +2,8 @@ import { register, start } from './router.js';
 import { renderHome } from './pages/home.js';
 import { renderRoom } from './pages/room.js';
 import './style.css';
+import './background.js';
+import './theme.js';
 
 const root = document.getElementById('app');
 
