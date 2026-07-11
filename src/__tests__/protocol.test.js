@@ -313,7 +313,8 @@ describe('protocol — zombie detection', () => {
     vi.advanceTimersByTime(ADVANCE_TO_OFFLINE);
     const countBefore = updates.length;
 
-    mockRoom.triggerAction('heartbeat', { participantId: 'u2' });
+    // Heartbeats are only honored from the connection that owns the identity.
+    mockRoom.triggerAction('heartbeat', { participantId: 'u2' }, 'peer-u2');
 
     expect(updates.length).toBeGreaterThan(countBefore); // emitted immediately
     expect(latest(updates).participants['u2'].online).toBe(true);
@@ -496,5 +497,93 @@ describe('protocol — payload validation', () => {
     const before = latest(updates).autoReveal;
     mockRoom.triggerAction('auto-reveal', { enabled: 'yes' });
     expect(latest(updates).autoReveal).toBe(before);
+  });
+});
+
+// ── Hostile peers ─────────────────────────────────────────────────────────────
+// A room ID is the only credential; once inside, a malicious peer can send
+// arbitrary payloads. These tests pin the protocol-level defenses.
+
+describe('protocol — hostile peers', () => {
+  let proto, updates;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ proto, updates } = await makeProtocol('u1', 'Alice'));
+    vi.advanceTimersByTime(1);
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Bob') }, 'peer-u2');
+  });
+
+  afterEach(() => { proto.destroy(); vi.useRealTimers(); });
+
+  it('rejects a vote sent on behalf of another participant', () => {
+    proto.startVoting('Story');
+    const roundId = latest(updates).roundId;
+    mockRoom.triggerAction('vote', { participantId: 'u2', card: '8', roundId }, 'peer-evil');
+    expect(latest(updates).votes['u2']).toBe(null);
+  });
+
+  it('rejects votes with cards outside the deck', () => {
+    proto.startVoting('Story');
+    const roundId = latest(updates).roundId;
+    mockRoom.triggerAction('vote', { participantId: 'u2', card: '<img onerror=x>', roundId }, 'peer-u2');
+    expect(latest(updates).votes['u2']).toBe(null);
+  });
+
+  it('rejects a join that claims our own identity', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u1', 'Impostor') }, 'peer-evil');
+    expect(latest(updates).participants['u1'].name).toBe('Alice');
+  });
+
+  it('rejects hijacking an id bound to a live connection', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Impostor') }, 'peer-evil');
+    expect(latest(updates).participants['u2'].name).toBe('Bob');
+  });
+
+  it('rejects heartbeat and leave from a non-owner connection', () => {
+    mockRoom.triggerAction('leave', { participantId: 'u2' }, 'peer-evil');
+    expect(latest(updates).participants['u2'].online).toBe(true);
+  });
+
+  it('truncates oversized names and story lists', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u3', 'x'.repeat(10_000)) }, 'peer-u3');
+    expect(latest(updates).participants['u3'].name.length).toBeLessThanOrEqual(40);
+
+    mockRoom.triggerAction('stories-load', { stories: Array.from({ length: 5_000 }, () => 'y'.repeat(9_000)) });
+    const s = latest(updates);
+    expect(s.stories.length).toBeLessThanOrEqual(300);
+    expect(s.stories[0].length).toBeLessThanOrEqual(500);
+  });
+
+  it('sanitizes a malicious state-sync instead of adopting it wholesale', async () => {
+    // Fresh protocol with no known peers so state-sync applies
+    vi.resetModules();
+    const fresh = await makeProtocol('u9', 'Nine');
+    vi.advanceTimersByTime(1);
+
+    mockRoom.triggerAction('state-sync', { state: {
+      roomId: 'SPOOFED',
+      stories: [null, { evil: true }, 'ok'],
+      currentIndex: 'NaN-ish',
+      storyTitle: 42,
+      phase: 'not-a-phase',
+      votes: { u8: '<script>' },
+      participants: { u8: { id: 'u8', name: 123, online: 'maybe', extra: 'field' } },
+      roundId: { obj: true },
+      autoReveal: 'nope',
+    } });
+
+    const s = latest(fresh.updates);
+    expect(s.roomId).toBe('ROOM-TEST');           // own roomId kept
+    expect(s.stories).toEqual(['ok']);            // non-strings dropped
+    expect(s.currentIndex).toBe(-1);
+    expect(s.storyTitle).toBe('');
+    expect(s.phase).toBe('waiting');
+    expect(s.votes['u8']).toBe(null);             // invalid card nulled
+    expect(s.participants['u8'].name).toBe('Anon');
+    expect(s.participants['u8'].extra).toBeUndefined();
+    expect(typeof s.roundId).toBe('string');
+    fresh.proto.destroy();
   });
 });

@@ -1,3 +1,6 @@
+/** The only card values a vote may carry — shared by UI and protocol validation. */
+export const DECK = ['1', '2', '3', '5', '8', '13', '21', '?', '☕'];
+
 export function createInitialState(roomId) {
   return {
     roomId,

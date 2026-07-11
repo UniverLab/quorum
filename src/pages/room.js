@@ -1,6 +1,6 @@
 import { createProtocol } from '../protocol.js';
 import { getUserId, getUserName, setUserName } from '../identity.js';
-import { computeStats } from '../state.js';
+import { computeStats, DECK } from '../state.js';
 import { setCleanup, navigate } from '../router.js';
 
 // Simple markdown renderer
@@ -20,8 +20,6 @@ function renderMd(text) {
     .replace(/\n/g, '<br>');
 }
 
-const DECK = ['1', '2', '3', '5', '8', '13', '21', '?', '☕'];
-
 export function renderRoom(root, roomId) {
   const name = getUserName();
   if (!name) {
@@ -37,7 +35,7 @@ function renderNameModal(root, roomId) {
   root.innerHTML = `
     <div class="modal-overlay">
       <div class="modal">
-        <p class="modal-room">Room <span class="mono">${roomId}</span></p>
+        <p class="modal-room">Room <span class="mono">${escHtml(roomId)}</span></p>
         <h2>What's your name?</h2>
         <input id="name-input" type="text" placeholder="Your name" maxlength="32" autocomplete="nickname" />
         <button id="btn-enter">Join room</button>
@@ -61,17 +59,16 @@ function renderNameModal(root, roomId) {
 
 function startRoom(root, roomId, userId, userName) {
   let protocol = null;
-  let countdownTimer = null;
+  let animating = false;
   let prevPhase = null;
 
   root.innerHTML = `
     <div class="room">
       <header class="room-header">
         <a href="#" class="room-logo-link" id="btn-home">
-          <svg class="room-logo-icon" width="20" height="20" viewBox="0 0 100 100" fill="currentColor">
-            <path d="M 50.4,0.2 C 46.7,0.2 43,0.9 40.2,2.4 L 12.5,17.2 C 6.9,20.2 6.9,25 12.5,28 l 27.7,14.7 c 1.9,1 4.1,1.6 6.4,2 -0.01,-0.1 -0.01,-0.2 -0.01,-0.3 v -20.1 c 0,-1.9 1.7,-3.5 3.7,-3.5 2.1,0 3.7,1.6 3.7,3.5 v 20.1 c 0,0.1 0,0.2 0,0.3 2.3,-0.3 4.5,-1 6.4,-2 l 27.7,-14.8 c 5.6,-3 5.6,-7.8 0,-10.8 L 60.6,2.3 C 57.8,0.9 54.1,0.2 50.4,0.2 Z"/>
-            <path d="m 97.4,76.5 c 1.8,-3 2.9,-6.3 2.9,-9.3 l 0.2,-29.6 c -0.01,-6 -4.5,-8.4 -10.1,-5.3 l -27.4,15.2 c -1.8,1 -3.6,2.5 -5,4.2 0.1,0 0.2,0.1 0.3,0.1 l 18.8,10 c 1.8,1 2.4,3.1 1.4,4.7 -1,1.7 -3.3,2.3 -5.1,1.3 l -18.8,-10 c -0.1,0 -0.2,0.1 -0.3,0.1 -0.8,2.1 -1.3,4.2 -1.3,6.2 l 0.1,29.7 c 0.01,6 4.5,8.4 10.1,5.3 l 27.4,-15.2 c 2.8,-1.5 5.3,-4.1 7.1,-7.1 z"/>
-            <path d="M 3.1,76.5 C 1.3,73.5 0.2,70.2 0.2,67.2 L 0.2,37.6 C 0.3,31.6 4.8,29 10.3,32 l 27.4,15.2 c 1.8,1 3.6,2.5 5,4.2 -0.1,0 -0.2,0.1 -0.3,0.1 l -18.8,10 c -1.8,1 -2.4,3.1 -1.4,4.7 1,1.7 3.3,2.3 5.1,1.3 l 18.8,-10 c 0.1,0 0.2,0.1 0.3,0.1 0.8,2.1 1.3,4.2 1.3,6.2 l -0.1,29.7 c -0.01,6 -4.5,8.4 -10.1,5.3 L 10.2,83.6 C 7.4,82.1 4.9,79.5 3.1,76.5 Z"/>
+          <svg class="room-logo-icon" width="22" height="22" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="4" fill="currentColor" opacity="0.15"/>
+            <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="currentColor">Q</text>
           </svg>
           <span class="room-logo">Quorum</span>
         </a>
@@ -124,7 +121,8 @@ function startRoom(root, roomId, userId, userName) {
   });
 
   function onCountdown() {
-    if (countdownTimer) return 0;
+    if (animating) return 0;
+    animating = true; // gate onUpdate immediately — an emit during the slide would clobber the overlay
 
     const s = state();
     const peers = Object.values(s.participants);
@@ -132,6 +130,13 @@ function startRoom(root, roomId, userId, userName) {
 
     const n = peers.length;
     const spreadRadius = Math.min(180, 80 + n * 30);
+
+    // Timeline: slide in (1.4s CSS + stagger) → vibrate (~1.25s) → flip
+    // (0.5s + stagger) → short hold. The protocol delays the 'revealed'
+    // emit by the returned total, and `animating` opens just before it.
+    const slideEnd = 1500 + n * 60;
+    const flipsEnd = slideEnd + 1300 + n * 100 + 500;
+    const total    = flipsEnd + 900;
 
     mainEl.innerHTML = `
       <section class="reveal-overlay" id="reveal-overlay">
@@ -167,15 +172,17 @@ function startRoom(root, roomId, userId, userName) {
       });
     });
 
-    // Phase 2: Particles + vibration (starts at 1s, ramps for 2.5s)
+    // Phase 2: particles + vibration — only after the slide transition has
+    // finished (an inline transform would cut it short and drift instead of
+    // jittering, since .slide-to-center defines a 1.4s transform transition).
     setTimeout(() => {
       const overlay = mainEl.querySelector('#reveal-overlay');
-      if (overlay) {
+      if (overlay && window.startRevealMode) {
         const rect = overlay.getBoundingClientRect();
-        if (window.startRevealMode) {
-          window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100);
-        }
+        window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100);
       }
+
+      cards.forEach(card => { card.style.transition = 'none'; });
 
       let intensity = 0;
       const vibrateInterval = setInterval(() => {
@@ -191,22 +198,28 @@ function startRoom(root, roomId, userId, userName) {
 
         if (intensity >= 1) {
           clearInterval(vibrateInterval);
-          // Phase 3: Flip
+          // Phase 3: flip. Keep .slide-to-center — dropping it snaps the card
+          // back to its spread position; only the inner element rotates.
           cards.forEach((card, i) => {
             setTimeout(() => {
+              card.style.transition = '';
               card.style.transform = '';
-              card.classList.remove('slide-to-center');
-              void card.offsetHeight;
               card.classList.add('flipping');
             }, i * 100);
           });
         }
       }, 25);
-      countdownTimer = vibrateInterval;
-    }, 1000);
+    }, slideEnd);
+
+    // Hand the screen back: stop the particle rain and let the protocol's
+    // 'revealed' emit (at `total`) render the results.
+    setTimeout(() => {
+      window.endRevealMode?.();
+      animating = false;
+    }, total - 200);
 
     // Return total animation duration so protocol waits for it
-    return 4200;
+    return total;
   }
 
   function state() { return protocol?.getState(); }
@@ -222,8 +235,8 @@ function startRoom(root, roomId, userId, userName) {
       window.setQuorumPeers(Object.values(s.participants));
     }
 
-    // If countdown is running, don't clobber it
-    if (countdownTimer) return;
+    // If the reveal animation is running, don't clobber it
+    if (animating) return;
 
     const phaseChanged = s.phase !== prevPhase;
     prevPhase = s.phase;
@@ -236,7 +249,10 @@ function startRoom(root, roomId, userId, userName) {
   }
 
   protocol = createProtocol(roomId, userId, userName, onUpdate, onCountdown);
-  setCleanup(() => protocol.destroy());
+  setCleanup(() => {
+    window.endRevealMode?.();
+    protocol.destroy();
+  });
 }
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
@@ -546,61 +562,58 @@ function renderRevealed(el, s, userId, protocol, force) {
   const stats = computeStats(s.votes);
   const hasNextStory = s.stories.length > 0 && s.currentIndex < s.stories.length - 1;
 
-  // Reveal animation: charge phase then show cards
+  // The reveal spectacle already played in the overlay (onCountdown) —
+  // show the results directly, no second charge animation.
   if (force || !el.querySelector('.revealed')) {
     el.innerHTML = `
-      <section class="revealed reveal-charge">
-        <div class="reveal-center-glow"></div>
-        <div class="reveal-rays">
-          ${peers.map((p, i) => {
-            const angle = (i / peers.length) * 360;
-            return `<div class="reveal-ray" style="--angle: ${angle}deg; --delay: ${i * 0.08}s"></div>`;
+      <section class="revealed">
+        ${s.storyTitle ? `<h2 class="story-title">${escHtml(s.storyTitle)}</h2>` : ''}
+
+        <div class="revealed-cards">
+          ${peers.map(p => {
+            const vote    = s.votes[p.id];
+            const offline = p.online === false;
+            return `
+              <div class="rcard ${offline ? 'offline' : ''}">
+                <div class="rcard-value">${escHtml(vote ?? '—')}</div>
+                <span class="rcard-name">${escHtml(p.name)}</span>
+              </div>
+            `;
           }).join('')}
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span class="stat-label">avg</span><strong>${stats.avg}</strong></div>
+          <div class="stat"><span class="stat-label">min</span><strong>${stats.min}</strong></div>
+          <div class="stat"><span class="stat-label">max</span><strong>${stats.max}</strong></div>
+        </div>
+
+        <div class="revealed-actions">
+          <button id="btn-next-round" class="btn-ghost">New round</button>
+          <button id="btn-new-story" class="btn-primary">${hasNextStory ? 'Next story →' : 'New story'}</button>
+          <button id="btn-back-room-desk" class="btn-ghost btn-back">← Room</button>
         </div>
       </section>
     `;
 
-    // After charge phase, show revealed cards
-    setTimeout(() => {
-      el.innerHTML = `
-        <section class="revealed">
-          ${s.storyTitle ? `<h2 class="story-title">${escHtml(s.storyTitle)}</h2>` : ''}
-
-          <div class="revealed-cards">
-            ${peers.map(p => {
-              const vote    = s.votes[p.id];
-              const offline = p.online === false;
-              return `
-                <div class="rcard ${offline ? 'offline' : ''}">
-                  <div class="rcard-value">${escHtml(vote ?? '—')}</div>
-                  <span class="rcard-name">${escHtml(p.name)}</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
-
-          <div class="stats">
-            <div class="stat"><span class="stat-label">avg</span><strong>${stats.avg}</strong></div>
-            <div class="stat"><span class="stat-label">min</span><strong>${stats.min}</strong></div>
-            <div class="stat"><span class="stat-label">max</span><strong>${stats.max}</strong></div>
-          </div>
-
-          <div class="revealed-actions">
-            <button id="btn-next-round" class="btn-ghost">New round</button>
-            <button id="btn-new-story" class="btn-primary">${hasNextStory ? 'Next story →' : 'New story'}</button>
-            <button id="btn-back-room-desk" class="btn-ghost btn-back">← Room</button>
-          </div>
-        </section>
-      `;
-
-      el.querySelector('#btn-next-round').addEventListener('click', () => protocol.nextRound());
-      el.querySelector('#btn-new-story').addEventListener('click', () => protocol.nextStory());
-      el.querySelector('#btn-back-room-desk')?.addEventListener('click', () => protocol.backToWaiting());
-    }, 1400); // charge + ray duration
+    el.querySelector('#btn-next-round').addEventListener('click', () => protocol.nextRound());
+    el.querySelector('#btn-new-story').addEventListener('click', () => {
+      if (hasNextStory) protocol.nextStory();
+      else protocol.newStory();
+    });
+    el.querySelector('#btn-back-room-desk')?.addEventListener('click', () => protocol.backToWaiting());
   }
 }
 
 // ── Export helper ─────────────────────────────────────────────────────────────
+
+// Quote a CSV cell and neutralize spreadsheet formula injection — peer names
+// and stories are untrusted, and Excel executes cells starting with = + - @.
+function csvCell(value) {
+  let cell = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(cell)) cell = `'${cell}`;
+  return `"${cell.replace(/"/g, '""')}"`;
+}
 
 function exportAllResults(s) {
   const csv = 'Story,Votes\n' + s.stories.map((story, i) => {
@@ -608,7 +621,7 @@ function exportAllResults(s) {
       const peer = Object.values(s.participants).find(p => p.id === uid);
       return `${peer?.name || 'Unknown'}: ${v}`;
     }).join('; ');
-    return `"${story.replace(/"/g, '""')}","${votes || 'No votes'}"`;
+    return `${csvCell(story)},${csvCell(votes || 'No votes')}`;
   }).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
