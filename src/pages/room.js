@@ -248,13 +248,13 @@ function loadStoriesFromStorage(roomId) {
   }
 }
 
-function saveResultToStorage(roomId, storyTitle, votes, participants) {
+function saveResultToStorage(roomId, storyId, storyTitle, votes) {
   const key = `quorum-results-${roomId}`;
   const existing = JSON.parse(localStorage.getItem(key) || '[]');
   const stats = computeStats(votes);
-  // Remove previous result for this story
-  const filtered = existing.filter(r => r.story !== (storyTitle || 'Untitled'));
-  filtered.push({ story: storyTitle || 'Untitled', avg: stats.avg, min: stats.min, max: stats.max, date: new Date().toISOString() });
+  // Remove previous result for this story ID
+  const filtered = existing.filter(r => r.id !== storyId);
+  filtered.push({ id: storyId, story: storyTitle || 'Untitled', avg: stats.avg, min: stats.min, max: stats.max, date: new Date().toISOString() });
   localStorage.setItem(key, JSON.stringify(filtered));
 }
 
@@ -297,7 +297,7 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
           <div class="stories-list" id="stories-list">
             ${s.stories.length === 0 ? '<p class="stories-empty">No stories yet. Add one below or load from CSV.</p>' : ''}
             ${s.stories.map((story, i) => {
-              const result = savedResults.find(r => r.story === story);
+              const result = savedResults.find(r => r.id === s.storyIds[i]);
               return `
               <div class="story-item${i === s.currentIndex ? ' active' : ''}" draggable="true" data-index="${i}">
                 <span class="story-drag" title="Drag to reorder">⠿</span>
@@ -579,7 +579,7 @@ function renderRevealed(el, s, userId, protocol, force, roomId) {
   // show the results directly, no second charge animation.
   if (force || !el.querySelector('.revealed')) {
     // Save this result to localStorage
-    saveResultToStorage(roomId, s.storyTitle, s.votes, s.participants);
+    saveResultToStorage(roomId, s.storyId, s.storyTitle, s.votes);
 
     el.innerHTML = `
       <section class="revealed">

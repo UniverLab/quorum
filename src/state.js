@@ -5,8 +5,10 @@ export function createInitialState(roomId) {
   return {
     roomId,
     stories: [],
+    storyIds: [],
     currentIndex: -1,
     storyTitle: '',
+    storyId: null,
     phase: 'waiting',
     votes: {},
     participants: {},

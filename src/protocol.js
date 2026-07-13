@@ -310,7 +310,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.storyTitle = title;
       state.phase = 'voting';
       state.roundId = newRoundId;
-      state.currentIndex = state.stories.indexOf(title);
+      const idx = state.stories.indexOf(title);
+      state.currentIndex = idx;
+      state.storyId = idx >= 0 ? state.storyIds[idx] : null;
       revealPending = false;
       clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
@@ -372,7 +374,17 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
     loadStories(text, newCurrentIndex) {
       const stories = text.split('\n').map(s => s.trim()).filter(Boolean);
+      // Generate IDs for new stories, keep existing ones
+      const newIds = stories.map((s, i) => {
+        // Keep existing ID if story at same index has same title
+        if (state.storyIds[i] && state.stories[i] === s) {
+          return state.storyIds[i];
+        }
+        // Generate new ID for new or changed stories
+        return crypto.randomUUID();
+      });
       state.stories = stories;
+      state.storyIds = newIds;
       if (newCurrentIndex !== undefined) {
         state.currentIndex = newCurrentIndex;
       } else {
