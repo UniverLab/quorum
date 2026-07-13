@@ -370,10 +370,14 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       emit();
     },
 
-    loadStories(text) {
+    loadStories(text, newCurrentIndex) {
       const stories = text.split('\n').map(s => s.trim()).filter(Boolean);
       state.stories = stories;
-      state.currentIndex = -1;
+      if (newCurrentIndex !== undefined) {
+        state.currentIndex = newCurrentIndex;
+      } else {
+        state.currentIndex = -1;
+      }
       sendStoriesLoad({ stories });
       emit();
     },

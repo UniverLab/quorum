@@ -251,12 +251,11 @@ function loadStoriesFromStorage(roomId) {
 function saveResultToStorage(roomId, storyTitle, votes, participants) {
   const key = `quorum-results-${roomId}`;
   const existing = JSON.parse(localStorage.getItem(key) || '[]');
-  const voteData = Object.entries(votes).map(([uid, v]) => {
-    const peer = participants[uid];
-    return `${peer?.name || 'Unknown'}: ${v}`;
-  }).join('; ');
-  existing.push({ story: storyTitle || 'Untitled', votes: voteData, date: new Date().toISOString() });
-  localStorage.setItem(key, JSON.stringify(existing));
+  const stats = computeStats(votes);
+  // Remove previous result for this story
+  const filtered = existing.filter(r => r.story !== (storyTitle || 'Untitled'));
+  filtered.push({ story: storyTitle || 'Untitled', avg: stats.avg, min: stats.min, max: stats.max, date: new Date().toISOString() });
+  localStorage.setItem(key, JSON.stringify(filtered));
 }
 
 function loadResultsFromStorage(roomId) {
@@ -297,15 +296,19 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
         <div class="stories-section">
           <div class="stories-list" id="stories-list">
             ${s.stories.length === 0 ? '<p class="stories-empty">No stories yet. Add one below or load from CSV.</p>' : ''}
-            ${s.stories.map((story, i) => `
+            ${s.stories.map((story, i) => {
+              const result = savedResults.find(r => r.story === story);
+              return `
               <div class="story-item${i === s.currentIndex ? ' active' : ''}" draggable="true" data-index="${i}">
                 <span class="story-drag" title="Drag to reorder">⠿</span>
                 <span class="story-num">${i + 1}</span>
                 <span class="story-text">${escHtml(story)}</span>
+                ${result ? `<span class="story-result">avg ${escHtml(result.avg)} · min ${escHtml(result.min)} · max ${escHtml(result.max)}</span>` : ''}
                 ${i === s.currentIndex ? '<span class="story-badge">Current</span>' : ''}
                 <button class="story-delete" data-index="${i}" title="Remove story">✕</button>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
           <div class="stories-input-area">
             <div class="story-input-wrap">
@@ -320,19 +323,6 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
             </div>
           </div>
         </div>
-        ${savedResults.length > 0 ? `
-          <div class="saved-results">
-            <h3>Voted stories (${savedResults.length})</h3>
-            <ul class="saved-results-list">
-              ${savedResults.map(r => `
-                <li>
-                  <span class="saved-story">${escHtml(r.story)}</span>
-                  <span class="saved-votes">${escHtml(r.votes)}</span>
-                </li>
-              `).join('')}
-            </ul>
-          </div>
-        ` : ''}
         <div class="waiting-actions">
           <button id="btn-start" class="btn-primary btn-start">Start voting</button>
           ${s.stories.length > 0 ? '<button id="btn-export-room" class="btn-action">Export results</button>' : ''}
@@ -421,7 +411,16 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
         const stories = [...currentState.stories];
         const [moved] = stories.splice(from, 1);
         stories.splice(to, 0, moved);
-        protocol.loadStories(stories.join('\n'));
+        // Update currentIndex to follow the moved story
+        let newCurrentIndex = currentState.currentIndex;
+        if (from === currentState.currentIndex) {
+          newCurrentIndex = to;
+        } else if (from < currentState.currentIndex && to >= currentState.currentIndex) {
+          newCurrentIndex--;
+        } else if (from > currentState.currentIndex && to <= currentState.currentIndex) {
+          newCurrentIndex++;
+        }
+        protocol.loadStories(stories.join('\n'), newCurrentIndex);
         saveStoriesToStorage(roomId, stories);
       });
     });
@@ -635,8 +634,8 @@ function csvCell(value) {
 
 function exportAllResults(s, roomId) {
   const saved = loadResultsFromStorage(roomId);
-  const csv = 'Story,Votes\n' + saved.map(r => {
-    return `${csvCell(r.story)},${csvCell(r.votes || 'No votes')}`;
+  const csv = 'Story,Avg,Min,Max\n' + saved.map(r => {
+    return `${csvCell(r.story)},${csvCell(r.avg)},${csvCell(r.min)},${csvCell(r.max)}`;
   }).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

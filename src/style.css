@@ -325,6 +325,17 @@ html[data-theme='arena'] .room-logo-link {
   background: rgba(192, 57, 43, 0.1);
 }
 
+.story-result {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 /* ── Modal ──────────────────────────────────────────────────────────────── */
 
 .modal-overlay {
@@ -591,52 +602,6 @@ html[data-theme='arena'] .home {
 
 .you { font-size: 0.72rem; color: var(--ink-faint); }
 .alone-hint { margin-top: 0.75rem; font-size: 0.82rem; color: var(--ink-dim); }
-
-/* ── Saved results ─────────────────────────────────────────────────────── */
-
-.saved-results {
-  padding: 1rem;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.saved-results h3 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-faint);
-  margin-bottom: 0.6rem;
-}
-
-.saved-results-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.saved-results-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.5rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.saved-story {
-  font-size: 0.9rem;
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.saved-votes {
-  font-size: 0.75rem;
-  color: var(--ink-dim);
-  font-family: var(--font-mono);
-}
 
 /* ── Voting phase ───────────────────────────────────────────────────────── */
 
