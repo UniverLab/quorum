@@ -5,13 +5,13 @@
 /* Espresso by default — the card table under a lamp, matching the landing:
    warm dark-brown ground, cream ink, amber cards. */
 :root {
-  --bg:          #1a120c;
-  --bg-surface:  #241a12;
-  --bg-raise:    #2f2318;
+  --bg:          #241a12;
+  --bg-surface:  #2f2318;
+  --bg-raise:    #3a2e22;
   --ink:         #f2e7d3;
   --ink-dim:     #b8a583;
   --ink-faint:   #8a7a5e;
-  --line:        #352a1f;
+  --line:        #40331f;
   --accent:      #e6b24a;
   --accent-dim:  rgba(230, 178, 74, 0.18);
   --danger:      #c0392b;
@@ -49,7 +49,7 @@ html[data-theme] {
 }
 
 body { min-height: 100dvh; display: flex; flex-direction: column; transition: background-color 0.5s ease; }
-#app { flex: 1; display: flex; flex-direction: column; }
+#app { display: flex; flex-direction: column; }
 
 /* ── Typography ──────────────────────────────────────────────────────────── */
 
@@ -99,13 +99,20 @@ button:active { opacity: 0.7; }
   text-decoration: none;
   color: var(--ink);
   transition: opacity 0.2s;
+  --logo-bg: var(--accent);
+  --logo-fg: #18130a;
 }
 .room-logo-link:hover { opacity: 0.8; }
 
 .room-logo-icon {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
+}
+
+html[data-theme='arena'] .room-logo-link {
+  --logo-bg: #3a2a1a;
+  --logo-fg: var(--accent);
 }
 
 /* ── Leave button ─────────────────────────────────────────────────────────── */
@@ -361,7 +368,7 @@ button:active { opacity: 0.7; }
 /* ── Home page ───────────────────────────────────────────────────────────── */
 
 .page.home {
-  flex: 1;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -587,7 +594,17 @@ html[data-theme='arena'] .home {
 
 /* ── Voting phase ───────────────────────────────────────────────────────── */
 
-.voting { display: flex; flex-direction: column; gap: 1.25rem; }
+.voting {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem 1.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 70vh;
+  justify-content: center;
+}
 
 .story-title {
   font-family: Georgia, 'Times New Roman', serif;
@@ -648,17 +665,17 @@ html[data-theme='arena'] .home {
 }
 
 .pcard-face {
-  width: 3.2rem; height: 4.2rem;
+  width: 3.5rem; height: 4.6rem;
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
-  background: var(--bg-surface);
+  background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.25s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .pcard-face::before {
@@ -678,8 +695,8 @@ html[data-theme='arena'] .home {
 
 .pcard.voted .pcard-face {
   border-color: var(--accent);
-  background: var(--accent-dim);
-  box-shadow: 0 8px 20px rgba(230, 178, 74, 0.25);
+  background: linear-gradient(135deg, var(--accent-dim), rgba(230, 178, 74, 0.08));
+  box-shadow: 0 8px 24px rgba(230, 178, 74, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 .pcard.voted .pcard-face::before { display: none; }
 
@@ -690,7 +707,7 @@ html[data-theme='arena'] .home {
   z-index: 1;
 }
 .pcard-name {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-family: var(--font-mono);
   color: var(--ink-dim);
   max-width: 4.5rem;
@@ -698,6 +715,7 @@ html[data-theme='arena'] .home {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 .pcard.offline { opacity: 0.4; }
 
@@ -707,6 +725,10 @@ html[data-theme='arena'] .home {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .toggle-label {
@@ -722,7 +744,7 @@ html[data-theme='arena'] .home {
 .toggle-track {
   position: relative;
   display: inline-block;
-  width: 2.2rem; height: 1.2rem;
+  width: 2.4rem; height: 1.3rem;
 }
 
 .toggle-track input { opacity: 0; width: 0; height: 0; position: absolute; }
@@ -732,19 +754,21 @@ html[data-theme='arena'] .home {
   inset: 0;
   background: var(--line);
   border-radius: 1rem;
-  transition: background 0.2s;
+  transition: background 0.2s ease;
+  cursor: pointer;
 }
 .toggle-thumb::after {
   content: '';
   position: absolute;
-  width: 0.85rem; height: 0.85rem;
-  top: 0.175rem; left: 0.175rem;
+  width: 0.9rem; height: 0.9rem;
+  top: 0.2rem; left: 0.2rem;
   background: #fff;
   border-radius: 50%;
-  transition: transform 0.2s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 .toggle-track input:checked + .toggle-thumb { background: var(--accent); }
-.toggle-track input:checked + .toggle-thumb::after { transform: translateX(1rem); }
+.toggle-track input:checked + .toggle-thumb::after { transform: translateX(1.1rem); box-shadow: 0 2px 8px rgba(230, 178, 74, 0.4); }
 
 /* Deck */
 .deck {
@@ -752,12 +776,17 @@ html[data-theme='arena'] .home {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: center;
+  padding: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 0.5rem;
 }
 
 .card {
-  width: 3.4rem; height: 4.6rem;
+  width: 3.5rem; height: 4.8rem;
   font-family: var(--font-mono);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 600;
   background: var(--bg-surface);
   color: var(--ink);
@@ -765,20 +794,20 @@ html[data-theme='arena'] .home {
   border-radius: var(--radius);
   padding: 0;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 .card:hover {
   border-color: var(--accent);
   color: var(--ink);
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .card.selected {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #d4a23a);
   border-color: var(--accent);
   color: #18130a;
   transform: translateY(-6px);
-  box-shadow: 0 12px 28px rgba(230, 178, 74, 0.35);
+  box-shadow: 0 12px 28px rgba(230, 178, 74, 0.4), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 
 /* ── Poker countdown ──────────────────────────────────────────────────────── */
@@ -848,7 +877,11 @@ html[data-theme='arena'] .home {
 
 /* ── Revealed phase ─────────────────────────────────────────────────────── */
 
-.revealed { display: flex; flex-direction: column; gap: 1.5rem; }
+.revealed {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 
 /* ── Reveal animation overlay ──────────────────────────────────────────── */
 
@@ -878,6 +911,7 @@ html[data-theme='arena'] .home {
   gap: 1rem;
   justify-content: center;
   perspective: 800px;
+  align-items: flex-end;
 }
 
 /* Individual reveal card — starts spread out, slides to center */
@@ -904,39 +938,56 @@ html[data-theme='arena'] .home {
   height: 5rem;
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
-  background: var(--bg-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  color: var(--ink);
   position: relative;
-  overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transform-style: preserve-3d;
-  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.reveal-card-face {
-  backface-visibility: hidden;
-}
-
+.reveal-card-face,
 .reveal-card-back {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius);
   backface-visibility: hidden;
-  transform: rotateY(180deg);
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.reveal-card-face {
+  background: var(--bg-surface);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.reveal-card-face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--accent-dim) 0,
+    var(--accent-dim) 1px,
+    transparent 0,
+    transparent 50%
+  );
+  background-size: 8px 8px;
+  opacity: 0.5;
+}
+
+.reveal-card-back {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--accent);
   color: var(--accent);
+  transform: rotateY(180deg);
 }
 
 .reveal-card.flipping .reveal-card-inner {
   transform: rotateY(180deg);
-  border-color: var(--accent);
   box-shadow: 0 8px 24px rgba(230, 178, 74, 0.35);
 }
 
@@ -962,6 +1013,7 @@ html[data-theme='arena'] .home {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
 }
 
 .rcard {
@@ -973,10 +1025,10 @@ html[data-theme='arena'] .home {
 }
 
 .rcard-value {
-  width: 3.2rem; height: 4.4rem;
+  width: 3.5rem; height: 4.6rem;
   border: 1.5px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--accent-dim);
+  background: linear-gradient(135deg, var(--accent-dim), rgba(230, 178, 74, 0.08));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -984,10 +1036,11 @@ html[data-theme='arena'] .home {
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--ink);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .rcard.offline .rcard-value { border-color: var(--line); background: transparent; color: var(--ink-faint); }
-.rcard-name { font-size: 0.72rem; color: var(--ink-dim); max-width: 4rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rcard-name { font-size: 0.72rem; color: var(--ink-dim); max-width: 4rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.02em; }
 
 @keyframes card-flip {
   from { opacity: 0; transform: rotateY(90deg) scale(0.9); }
@@ -998,17 +1051,31 @@ html[data-theme='arena'] .home {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  align-items: center;
 }
 .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); }
 .stat strong { font-size: 1.4rem; font-family: var(--font-mono); color: var(--ink); }
 
-.revealed-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.revealed-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.next-story-hint {
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin-left: 0.5rem;
+}
 
 /* ── Loading state ──────────────────────────────────────────────────────── */
 .loading { color: var(--ink-dim); font-size: 0.9rem; padding: 2rem 0; }

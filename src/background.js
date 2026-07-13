@@ -96,8 +96,6 @@ function makeSpark(peerId, t) {
     p1: rng() * 6.283,
     p2: rng() * 6.283,
     fadeOut: 0,
-    // Reveal mode
-    convergeProgress: 0, // 0 = normal spiral, 1 = converged to center
   };
 }
 
@@ -139,49 +137,41 @@ window.startRevealMode = function (cx, cy, radius) {
   revealCenterY = cy;
   revealRadius = radius;
   revealParticles.length = 0;
-
-  // Reset converge progress for all sparks
-  for (const sp of peerSparks.values()) {
-    sp.convergeProgress = 0;
-  }
 };
 
 window.endRevealMode = function () {
   revealMode = false;
   revealParticles.length = 0;
-  for (const sp of peerSparks.values()) {
-    sp.convergeProgress = 0;
-  }
 };
 
 // ── Particle rain ──────────────────────────────────────────────────────────
 
 function makeParticle(sx, sy, tx, ty, t, rng) {
-  const speed = 0.4 + rng() * 0.6; // 0.4–1.0 progress per second
-  const life = 1500 + rng() * 2000;
+  const speed = 1.2 + rng() * 1.0; // 1.2–2.2 — fast convergence
+  const life = 400 + rng() * 600;   // short-lived, arrives quickly
   return {
     sx, sy, tx, ty,
     born: t,
     life,
     speed,
-    // Noise params for wobbly path
-    noiseAmp: 15 + rng() * 30,
-    noiseFreq1: 0.002 + rng() * 0.004,
-    noiseFreq2: 0.005 + rng() * 0.008,
+    noiseAmp: 6 + rng() * 14,
+    noiseFreq1: 0.003 + rng() * 0.005,
+    noiseFreq2: 0.007 + rng() * 0.01,
     noisePhase: rng() * 6.283,
     noisePhase2: rng() * 6.283,
-    size: 1 + rng() * 2,
+    size: 0.4 + rng() * 1.1,
   };
 }
 
 function updateParticles(t) {
-  // Spawn new particles from each spark
+  // Spawn new particles from each spark's spiral position
   const elapsed = t - revealStartTime;
-  const spawnRate = Math.min(0.6, 0.08 + elapsed * 0.0002); // ramps up quickly
+  const spawnRate = Math.min(1.2, 0.3 + elapsed * 0.0005);
 
   for (const sp of peerSparks.values()) {
     if (sp.fadeOut) continue;
     if (Math.random() < spawnRate) {
+      // Get the spark's current spiral position (original trajectory)
       const lt = t - sp.born;
       let s = sp.s0 + sp.drift * Math.sin(lt * 0.0002) +
         sp.amp * (Math.sin(lt * sp.w1 + sp.p1) + 0.6 * Math.sin(lt * sp.w2 + sp.p2));
@@ -211,8 +201,8 @@ function drawParticles(t, color) {
   for (const p of revealParticles) {
     const age = t - p.born;
     const progress = Math.min(1, (age / p.life) * p.speed);
-    const fadeIn = Math.min(1, age / 200);
-    const fadeOut = Math.min(1, (p.life - age) / 400);
+    const fadeIn = Math.min(1, age / 80);
+    const fadeOut = Math.min(1, (p.life - age) / 150);
     const alpha = fadeIn * fadeOut;
 
     // Linear interpolation with noise
@@ -288,15 +278,8 @@ function animate(t) {
   }
   c.stroke();
 
-  // Reveal mode: converge sparks and update particles
+  // Reveal mode: update particles (sparks keep original spiral path)
   if (revealMode) {
-    const elapsed = t - revealStartTime;
-    const convergeSpeed = 0.0012;
-    for (const sp of peerSparks.values()) {
-      if (!sp.fadeOut) {
-        sp.convergeProgress = Math.min(1, sp.convergeProgress + convergeSpeed);
-      }
-    }
     updateParticles(t);
   }
 
@@ -321,21 +304,9 @@ function animate(t) {
     // Get spiral position
     const spiral = getSparkPos(sp, t);
 
-    // During reveal, interpolate toward center
-    let hx, hy;
-    const cp = sp.convergeProgress;
-    if (cp > 0) {
-      hx = spiral.x + (revealCenterX - spiral.x) * cp;
-      hy = spiral.y + (revealCenterY - spiral.y) * cp;
-      // Add subtle orbit around center during converge
-      const orbit = cp * 0.3;
-      const angle = lt * 0.002 + sp.p1;
-      hx += Math.cos(angle) * orbit * 40;
-      hy += Math.sin(angle) * orbit * 40;
-    } else {
-      hx = spiral.x;
-      hy = spiral.y;
-    }
+    // During reveal, sparks stay on spiral path — only particles move to center
+    let hx = spiral.x;
+    let hy = spiral.y;
 
     const tw = 0.7 + 0.3 * Math.sin(t * 0.004 + sp.p1);
     const baseRad = revealMode ? 10 : 8;

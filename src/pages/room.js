@@ -66,9 +66,9 @@ function startRoom(root, roomId, userId, userName) {
     <div class="room">
       <header class="room-header">
         <a href="#" class="room-logo-link" id="btn-home">
-          <svg class="room-logo-icon" width="22" height="22" viewBox="0 0 32 32">
-            <rect width="32" height="32" rx="4" fill="currentColor" opacity="0.15"/>
-            <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="currentColor">Q</text>
+          <svg class="room-logo-icon" width="28" height="28" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="5" fill="var(--logo-bg)"/>
+            <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="var(--logo-fg)">Q</text>
           </svg>
           <span class="room-logo">Quorum</span>
         </a>
@@ -131,12 +131,12 @@ function startRoom(root, roomId, userId, userName) {
     const n = peers.length;
     const spreadRadius = Math.min(180, 80 + n * 30);
 
-    // Timeline: slide in (1.4s CSS + stagger) → vibrate (~1.25s) → flip
-    // (0.5s + stagger) → short hold. The protocol delays the 'revealed'
-    // emit by the returned total, and `animating` opens just before it.
+    // New timeline: particles start immediately → slide cards (1.4s) →
+    // wait for particles to converge (~2.5s) → flip cards → reveal.
+    const particleDuration = 2500; // particles emit for 2.5s
     const slideEnd = 1500 + n * 60;
-    const flipsEnd = slideEnd + 1300 + n * 100 + 500;
-    const total    = flipsEnd + 900;
+    const flipStart = Math.max(slideEnd, particleDuration) + 200; // wait for both slide AND particles
+    const total = flipStart + 800 + n * 150 + 500; // flip animation + hold
 
     mainEl.innerHTML = `
       <section class="reveal-overlay" id="reveal-overlay">
@@ -152,7 +152,7 @@ function startRoom(root, roomId, userId, userName) {
               <div class="reveal-card ${offline ? 'offline' : ''}" data-peer="${p.id}"
                    style="--sx: ${sx}px; --sy: ${sy}px;">
                 <div class="reveal-card-inner">
-                  <div class="reveal-card-face">🂠</div>
+                  <div class="reveal-card-face"></div>
                   <div class="reveal-card-back">${escHtml(vote ?? '?')}</div>
                 </div>
                 <span class="reveal-card-name">${escHtml(p.name)}</span>
@@ -165,51 +165,30 @@ function startRoom(root, roomId, userId, userName) {
 
     const cards = mainEl.querySelectorAll('.reveal-card');
 
-    // Phase 1: Slide cards to center (1s)
+    // Phase 1: Start particles IMMEDIATELY
+    requestAnimationFrame(() => {
+      const overlay = mainEl.querySelector('#reveal-overlay');
+      if (overlay && window.startRevealMode) {
+        const rect = overlay.getBoundingClientRect();
+        window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100);
+      }
+    });
+
+    // Phase 2: Slide cards to center (1.4s)
     requestAnimationFrame(() => {
       cards.forEach((card, i) => {
         setTimeout(() => card.classList.add('slide-to-center'), i * 60);
       });
     });
 
-    // Phase 2: particles + vibration — only after the slide transition has
-    // finished (an inline transform would cut it short and drift instead of
-    // jittering, since .slide-to-center defines a 1.4s transform transition).
+    // Phase 3: After particles converge, flip cards
     setTimeout(() => {
-      const overlay = mainEl.querySelector('#reveal-overlay');
-      if (overlay && window.startRevealMode) {
-        const rect = overlay.getBoundingClientRect();
-        window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100);
-      }
-
-      cards.forEach(card => { card.style.transition = 'none'; });
-
-      let intensity = 0;
-      const vibrateInterval = setInterval(() => {
-        intensity = Math.min(1, intensity + 0.02);
-        const px = intensity * 4;
-        const rot = intensity * 1.5;
-        cards.forEach(card => {
-          const dx = (Math.random() - 0.5) * px * 2;
-          const dy = (Math.random() - 0.5) * px * 2;
-          const dr = (Math.random() - 0.5) * rot;
-          card.style.transform = `translate(${dx}px, ${dy}px) rotate(${dr}deg)`;
-        });
-
-        if (intensity >= 1) {
-          clearInterval(vibrateInterval);
-          // Phase 3: flip. Keep .slide-to-center — dropping it snaps the card
-          // back to its spread position; only the inner element rotates.
-          cards.forEach((card, i) => {
-            setTimeout(() => {
-              card.style.transition = '';
-              card.style.transform = '';
-              card.classList.add('flipping');
-            }, i * 100);
-          });
-        }
-      }, 25);
-    }, slideEnd);
+      cards.forEach((card, i) => {
+        setTimeout(() => {
+          card.classList.add('flipping');
+        }, i * 150);
+      });
+    }, flipStart);
 
     // Hand the screen back: stop the particle rain and let the protocol's
     // 'revealed' emit (at `total`) render the results.
@@ -244,7 +223,7 @@ function startRoom(root, roomId, userId, userName) {
     switch (s.phase) {
       case 'waiting':  renderWaiting(mainEl, s, userId, protocol, phaseChanged, roomId); break;
       case 'voting':   renderVoting(mainEl, s, userId, protocol, phaseChanged);  break;
-      case 'revealed': renderRevealed(mainEl, s, userId, protocol, phaseChanged); break;
+      case 'revealed': renderRevealed(mainEl, s, userId, protocol, phaseChanged, roomId); break;
     }
   }
 
@@ -264,6 +243,25 @@ function saveStoriesToStorage(roomId, stories) {
 function loadStoriesFromStorage(roomId) {
   try {
     return JSON.parse(localStorage.getItem(`quorum-stories-${roomId}`)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveResultToStorage(roomId, storyTitle, votes, participants) {
+  const key = `quorum-results-${roomId}`;
+  const existing = JSON.parse(localStorage.getItem(key) || '[]');
+  const voteData = Object.entries(votes).map(([uid, v]) => {
+    const peer = participants[uid];
+    return `${peer?.name || 'Unknown'}: ${v}`;
+  }).join('; ');
+  existing.push({ story: storyTitle || 'Untitled', votes: voteData, date: new Date().toISOString() });
+  localStorage.setItem(key, JSON.stringify(existing));
+}
+
+function loadResultsFromStorage(roomId) {
+  try {
+    return JSON.parse(localStorage.getItem(`quorum-results-${roomId}`)) || [];
   } catch {
     return [];
   }
@@ -332,10 +330,10 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
     // Start voting — go to desk with or without stories
     el.querySelector('#btn-start').addEventListener('click', () => {
       if (s.stories.length > 0) {
-        protocol.loadStories(s.stories.join('\n'));
-        protocol.startVoting(s.stories[0]);
+        const idx = s.currentIndex >= 0 ? s.currentIndex : 0;
+        protocol.startVoting(s.stories[idx]);
       } else {
-        protocol.startVoting('Untitled');
+        protocol.startVoting('');
       }
     });
 
@@ -445,7 +443,7 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
 
     // Export all stories results (room view)
     el.querySelector('#btn-export-room')?.addEventListener('click', () => {
-      exportAllResults(s);
+      exportAllResults(s, roomId);
     });
   }
 
@@ -557,7 +555,7 @@ function renderVoting(el, s, userId, protocol, force) {
 
 // ── Phase: revealed ───────────────────────────────────────────────────────────
 
-function renderRevealed(el, s, userId, protocol, force) {
+function renderRevealed(el, s, userId, protocol, force, roomId) {
   const peers = Object.values(s.participants);
   const stats = computeStats(s.votes);
   const hasNextStory = s.stories.length > 0 && s.currentIndex < s.stories.length - 1;
@@ -565,6 +563,9 @@ function renderRevealed(el, s, userId, protocol, force) {
   // The reveal spectacle already played in the overlay (onCountdown) —
   // show the results directly, no second charge animation.
   if (force || !el.querySelector('.revealed')) {
+    // Save this result to localStorage
+    saveResultToStorage(roomId, s.storyTitle, s.votes, s.participants);
+
     el.innerHTML = `
       <section class="revealed">
         ${s.storyTitle ? `<h2 class="story-title">${escHtml(s.storyTitle)}</h2>` : ''}
@@ -591,6 +592,7 @@ function renderRevealed(el, s, userId, protocol, force) {
         <div class="revealed-actions">
           <button id="btn-next-round" class="btn-ghost">New round</button>
           <button id="btn-new-story" class="btn-primary">${hasNextStory ? 'Next story →' : 'New story'}</button>
+          ${hasNextStory ? `<span class="next-story-hint">${escHtml(s.stories[s.currentIndex + 1])}</span>` : ''}
           <button id="btn-back-room-desk" class="btn-ghost btn-back">← Room</button>
         </div>
       </section>
@@ -615,13 +617,10 @@ function csvCell(value) {
   return `"${cell.replace(/"/g, '""')}"`;
 }
 
-function exportAllResults(s) {
-  const csv = 'Story,Votes\n' + s.stories.map((story, i) => {
-    const votes = Object.entries(s.votes).map(([uid, v]) => {
-      const peer = Object.values(s.participants).find(p => p.id === uid);
-      return `${peer?.name || 'Unknown'}: ${v}`;
-    }).join('; ');
-    return `${csvCell(story)},${csvCell(votes || 'No votes')}`;
+function exportAllResults(s, roomId) {
+  const saved = loadResultsFromStorage(roomId);
+  const csv = 'Story,Votes\n' + saved.map(r => {
+    return `${csvCell(r.story)},${csvCell(r.votes || 'No votes')}`;
   }).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
