@@ -291,6 +291,7 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
   const shouldRerender = force || storiesChanged || !el.querySelector('.waiting');
 
   if (shouldRerender) {
+    const savedResults = loadResultsFromStorage(roomId);
     el.innerHTML = `
       <section class="waiting">
         <div class="stories-section">
@@ -319,6 +320,19 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
             </div>
           </div>
         </div>
+        ${savedResults.length > 0 ? `
+          <div class="saved-results">
+            <h3>Voted stories (${savedResults.length})</h3>
+            <ul class="saved-results-list">
+              ${savedResults.map(r => `
+                <li>
+                  <span class="saved-story">${escHtml(r.story)}</span>
+                  <span class="saved-votes">${escHtml(r.votes)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : ''}
         <div class="waiting-actions">
           <button id="btn-start" class="btn-primary btn-start">Start voting</button>
           ${s.stories.length > 0 ? '<button id="btn-export-room" class="btn-action">Export results</button>' : ''}
@@ -330,8 +344,10 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
     // Start voting — go to desk with or without stories
     el.querySelector('#btn-start').addEventListener('click', () => {
       if (s.stories.length > 0) {
-        const idx = s.currentIndex >= 0 ? s.currentIndex : 0;
-        protocol.startVoting(s.stories[idx]);
+        // Advance to next story, or wrap to 0 if at the end
+        const idx = s.currentIndex >= 0 ? s.currentIndex + 1 : 0;
+        const storyIdx = idx >= s.stories.length ? 0 : idx;
+        protocol.startVoting(s.stories[storyIdx]);
       } else {
         protocol.startVoting('');
       }

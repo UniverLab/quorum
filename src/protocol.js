@@ -310,6 +310,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.storyTitle = title;
       state.phase = 'voting';
       state.roundId = newRoundId;
+      state.currentIndex = state.stories.indexOf(title);
       revealPending = false;
       clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
