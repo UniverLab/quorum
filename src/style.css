@@ -660,6 +660,7 @@ html[data-theme='arena'] .home {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
 }
 
 .pcard {
@@ -952,7 +953,7 @@ html[data-theme='arena'] .home {
   position: relative;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transform-style: preserve-3d;
-  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .reveal-card-face,

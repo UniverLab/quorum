@@ -132,11 +132,11 @@ function startRoom(root, roomId, userId, userName) {
     const spreadRadius = Math.min(180, 80 + n * 30);
 
     // New timeline: particles start immediately → slide cards (1.4s) →
-    // wait for particles to converge (~2.5s) → flip cards → reveal.
+    // wait for particles to converge (~2.5s) → flip cards (0.6s) → reveal.
     const particleDuration = 2500; // particles emit for 2.5s
     const slideEnd = 1500 + n * 60;
     const flipStart = Math.max(slideEnd, particleDuration) + 200; // wait for both slide AND particles
-    const total = flipStart + 800 + n * 150 + 500; // flip animation + hold
+    const total = flipStart + 600 + n * 150 + 400; // flip animation + hold
 
     mainEl.innerHTML = `
       <section class="reveal-overlay" id="reveal-overlay">
