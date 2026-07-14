@@ -10,7 +10,8 @@ export function renderHome(root) {
       <div class="home-content">
         <div class="home-brand">
           <pre class="home-banner" aria-hidden="true">${BANNER}</pre>
-          <p class="home-subtitle">Planning poker p2p — no accounts, no server.</p>
+          <h1 class="home-subtitle">Planning poker, peer to peer</h1>
+          <p class="home-tagline">No accounts. No server. Just share a URL and vote together.</p>
         </div>
         <div class="home-actions">
           <button id="btn-new" class="btn-primary">New room</button>
@@ -19,6 +20,7 @@ export function renderHome(root) {
             <button id="btn-join" class="btn-ghost">Join</button>
           </div>
         </div>
+        <a href="/about" class="home-about-link">How it works →</a>
       </div>
     </div>
   `;
