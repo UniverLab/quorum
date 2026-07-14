@@ -2,11 +2,23 @@
 const K = Math.log(1.618) / (Math.PI / 2);
 const COLOR_NIGHT = '#e6b24a';
 const COLOR_DAY = '#c4922a';
+const BG_NIGHT = '#241a12';
+const BG_DAY = '#f0e8da';
 
 function getColor() {
   return document.documentElement.getAttribute('data-theme') === 'arena'
     ? COLOR_DAY
     : COLOR_NIGHT;
+}
+
+function getBg() {
+  return document.documentElement.getAttribute('data-theme') === 'arena'
+    ? BG_DAY
+    : BG_NIGHT;
+}
+
+function isDay() {
+  return document.documentElement.getAttribute('data-theme') === 'arena';
 }
 
 let canvas, c, w, h, dpr;
@@ -258,6 +270,11 @@ function animate(t) {
   requestAnimationFrame(animate);
   c.clearRect(0, 0, w, h);
   const A = getColor();
+  const day = isDay();
+
+  // Fill canvas with theme background
+  c.fillStyle = getBg();
+  c.fillRect(0, 0, w, h);
 
   // Fit tiling
   const S = (h * 0.82) / tiling.bh;
@@ -269,15 +286,15 @@ function animate(t) {
   // Whirling squares — brighter during reveal
   c.strokeStyle = A;
   c.lineWidth = 1;
-  c.globalAlpha = revealMode ? 0.22 : 0.12;
+  c.globalAlpha = revealMode ? (day ? 0.34 : 0.22) : (day ? 0.26 : 0.12);
   for (const q of tiling.squares) {
     c.strokeRect(toX(q.x), toY(q.y), q.s * S, q.s * S);
   }
 
   // Golden spiral — brighter during reveal
   c.lineCap = 'round';
-  c.lineWidth = 1.3;
-  c.globalAlpha = revealMode ? 0.25 : 0.12;
+  c.lineWidth = day ? 1.6 : 1.3;
+  c.globalAlpha = revealMode ? (day ? 0.38 : 0.25) : (day ? 0.29 : 0.12);
   c.beginPath();
   for (let i = 0; i <= 220; i++) {
     const th = (i / 220) * thMax;
@@ -293,55 +310,58 @@ function animate(t) {
     updateParticles(t);
   }
 
-  // Draw per-peer sparks
-  const FADE_MS = 2000;
-  for (const [id, sp] of peerSparks) {
-    if (sp.fadeOut) {
-      const fadeProgress = (t - sp.fadeOut) / FADE_MS;
-      if (fadeProgress >= 1) {
-        peerSparks.delete(id);
-        continue;
+  // Draw per-peer sparks — only on room pages
+  const inRoom = document.body.classList.contains('is-room');
+  if (inRoom) {
+    const FADE_MS = 2000;
+    for (const [id, sp] of peerSparks) {
+      if (sp.fadeOut) {
+        const fadeProgress = (t - sp.fadeOut) / FADE_MS;
+        if (fadeProgress >= 1) {
+          peerSparks.delete(id);
+          continue;
+        }
+        sp._fadeAlpha = 1 - fadeProgress;
+      } else {
+        sp._fadeAlpha = 1;
       }
-      sp._fadeAlpha = 1 - fadeProgress;
-    } else {
-      sp._fadeAlpha = 1;
+
+      const lt = t - sp.born;
+      const fadeIn = Math.min(1, lt / 1200);
+      const env = fadeIn * sp._fadeAlpha;
+
+      // Get spiral position
+      const spiral = getSparkPos(sp, t);
+
+      // During reveal, sparks stay on spiral path — only particles move to center
+      let hx = spiral.x;
+      let hy = spiral.y;
+
+      const tw = 0.7 + 0.3 * Math.sin(t * 0.004 + sp.p1);
+      const baseRad = revealMode ? 10 : 8;
+      const rad = baseRad * (0.8 + 0.2 * tw);
+
+      const g = c.createRadialGradient(hx, hy, 0, hx, hy, rad);
+      g.addColorStop(0, A + (revealMode ? 'ee' : 'cc'));
+      g.addColorStop(0.35, A + (revealMode ? '55' : '33'));
+      g.addColorStop(1, A + '00');
+      c.globalAlpha = env;
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(hx, hy, rad, 0, Math.PI * 2);
+      c.fill();
+
+      c.fillStyle = A;
+      c.globalAlpha = env * (0.5 + 0.35 * tw);
+      c.beginPath();
+      c.arc(hx, hy, revealMode ? 2 : 1.6, 0, Math.PI * 2);
+      c.fill();
     }
 
-    const lt = t - sp.born;
-    const fadeIn = Math.min(1, lt / 1200);
-    const env = fadeIn * sp._fadeAlpha;
-
-    // Get spiral position
-    const spiral = getSparkPos(sp, t);
-
-    // During reveal, sparks stay on spiral path — only particles move to center
-    let hx = spiral.x;
-    let hy = spiral.y;
-
-    const tw = 0.7 + 0.3 * Math.sin(t * 0.004 + sp.p1);
-    const baseRad = revealMode ? 10 : 8;
-    const rad = baseRad * (0.8 + 0.2 * tw);
-
-    const g = c.createRadialGradient(hx, hy, 0, hx, hy, rad);
-    g.addColorStop(0, A + (revealMode ? 'ee' : 'cc'));
-    g.addColorStop(0.35, A + (revealMode ? '55' : '33'));
-    g.addColorStop(1, A + '00');
-    c.globalAlpha = env;
-    c.fillStyle = g;
-    c.beginPath();
-    c.arc(hx, hy, rad, 0, Math.PI * 2);
-    c.fill();
-
-    c.fillStyle = A;
-    c.globalAlpha = env * (0.5 + 0.35 * tw);
-    c.beginPath();
-    c.arc(hx, hy, revealMode ? 2 : 1.6, 0, Math.PI * 2);
-    c.fill();
-  }
-
-  // Draw particle rain during reveal
-  if (revealMode) {
-    drawParticles(t, A);
+    // Draw particle rain during reveal
+    if (revealMode) {
+      drawParticles(t, A);
+    }
   }
 
   c.globalAlpha = 1;
