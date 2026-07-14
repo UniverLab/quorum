@@ -16,6 +16,7 @@ const peerSparks = new Map(); // peerId → spark
 let revealMode = false;
 let revealStartTime = 0;
 let revealCenterX = 0, revealCenterY = 0, revealRadius = 0;
+let revealCardPositions = []; // array of {x, y} for each card
 const revealParticles = [];
 
 // Seeded random from peer ID string
@@ -129,13 +130,15 @@ window.setQuorumPeers = function (participants) {
  * @param {number} cx - center X in viewport coords
  * @param {number} cy - center Y in viewport coords
  * @param {number} radius - target area radius
+ * @param {Array} cardPositions - array of {x, y} for each card
  */
-window.startRevealMode = function (cx, cy, radius) {
+window.startRevealMode = function (cx, cy, radius, cardPositions) {
   revealMode = true;
   revealStartTime = performance.now();
   revealCenterX = cx;
   revealCenterY = cy;
   revealRadius = radius;
+  revealCardPositions = cardPositions || [];
   revealParticles.length = 0;
 };
 
@@ -164,12 +167,14 @@ function makeParticle(sx, sy, tx, ty, t, rng) {
 }
 
 function updateParticles(t) {
-  // Spawn new particles from each spark's spiral position
+  // Spawn new particles from each spark to its paired card
   const elapsed = t - revealStartTime;
   const spawnRate = Math.min(1.2, 0.3 + elapsed * 0.0005);
 
-  for (const sp of peerSparks.values()) {
-    if (sp.fadeOut) continue;
+  const sparkArray = Array.from(peerSparks.values()).filter(sp => !sp.fadeOut);
+  const numCards = revealCardPositions.length;
+
+  sparkArray.forEach((sp, sparkIdx) => {
     if (Math.random() < spawnRate) {
       // Get the spark's current spiral position (original trajectory)
       const lt = t - sp.born;
@@ -183,10 +188,15 @@ function updateParticles(t) {
       const oy = h * 0.5 - (tiling.by + tiling.bh / 2) * S;
       const sx = ox + (pu + rHead * Math.cos(thHead)) * S;
       const sy = oy + (pv + rHead * Math.sin(thHead)) * S;
+
+      // Pair spark with card (round-robin if more sparks than cards)
+      const cardIdx = numCards > 0 ? sparkIdx % numCards : 0;
+      const target = numCards > 0 ? revealCardPositions[cardIdx] : { x: revealCenterX, y: revealCenterY };
+
       const rng = seededRand(hashId(`${sp.born}-${t}`));
-      revealParticles.push(makeParticle(sx, sy, revealCenterX, revealCenterY, t, rng));
+      revealParticles.push(makeParticle(sx, sy, target.x, target.y, t, rng));
     }
-  }
+  });
 
   // Remove dead particles
   for (let i = revealParticles.length - 1; i >= 0; i--) {

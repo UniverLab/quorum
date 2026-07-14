@@ -170,7 +170,16 @@ function startRoom(root, roomId, userId, userName) {
       const overlay = mainEl.querySelector('#reveal-overlay');
       if (overlay && window.startRevealMode) {
         const rect = overlay.getBoundingClientRect();
-        window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100);
+        // Get positions of each card for spark pairing
+        const cardEls = mainEl.querySelectorAll('.reveal-card');
+        const cardPositions = Array.from(cardEls).map(card => {
+          const cardRect = card.getBoundingClientRect();
+          return {
+            x: cardRect.left + cardRect.width / 2,
+            y: cardRect.top + cardRect.height / 2
+          };
+        });
+        window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100, cardPositions);
       }
     });
 
