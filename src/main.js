@@ -1,6 +1,7 @@
 import { register, start } from './router.js';
 import { renderHome } from './pages/home.js';
 import { renderRoom } from './pages/room.js';
+import { renderAbout } from './pages/about.js';
 import './style.css';
 import './background.js';
 import './theme.js';
@@ -9,6 +10,7 @@ const root = document.getElementById('app');
 
 register('/', () => renderHome(root));
 register('/room/:id', (id) => renderRoom(root, id));
+register('/about', () => renderAbout(root));
 
 // Persistent footer — lives outside #app so it survives page transitions
 const footer = document.createElement('footer');
@@ -25,12 +27,14 @@ footer.innerHTML = `
       </a>
     </div>
     <nav class="footer-nav">
-      <a href="https://univerlab.org" target="_blank" rel="noopener noreferrer">UniverLab</a>
+      <a href="/">Home</a>
+      <a href="/about">About</a>
       <a href="https://github.com/UniverLab/quorum" target="_blank" rel="noopener noreferrer">GitHub</a>
-      <a href="https://univerlab.org/experiments" target="_blank" rel="noopener noreferrer">More experiments</a>
+      <a href="https://univerlab.org" target="_blank" rel="noopener noreferrer">UniverLab</a>
     </nav>
   </div>
   <div class="footer-base">
+    <span class="footer-privacy">No analytics. No cookies. No tracking.</span>
     <span class="footer-word">UNIVERLAB</span>
   </div>
 `;
