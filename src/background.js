@@ -286,7 +286,7 @@ function animate(t) {
   // Whirling squares — brighter during reveal
   c.strokeStyle = A;
   c.lineWidth = 1;
-  c.globalAlpha = revealMode ? (day ? 0.34 : 0.22) : (day ? 0.26 : 0.12);
+  c.globalAlpha = revealMode ? (day ? 0.34 : 0.22) : (day ? 0.24 : 0.12);
   for (const q of tiling.squares) {
     c.strokeRect(toX(q.x), toY(q.y), q.s * S, q.s * S);
   }
@@ -294,7 +294,7 @@ function animate(t) {
   // Golden spiral — brighter during reveal
   c.lineCap = 'round';
   c.lineWidth = day ? 1.6 : 1.3;
-  c.globalAlpha = revealMode ? (day ? 0.38 : 0.25) : (day ? 0.29 : 0.12);
+  c.globalAlpha = revealMode ? (day ? 0.38 : 0.25) : (day ? 0.27 : 0.12);
   c.beginPath();
   for (let i = 0; i <= 220; i++) {
     const th = (i / 220) * thMax;
