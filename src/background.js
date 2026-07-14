@@ -147,8 +147,8 @@ window.endRevealMode = function () {
 // ── Particle rain ──────────────────────────────────────────────────────────
 
 function makeParticle(sx, sy, tx, ty, t, rng) {
-  const speed = 1.2 + rng() * 1.0; // 1.2–2.2 — fast convergence
-  const life = 400 + rng() * 600;   // short-lived, arrives quickly
+  const speed = 1.8 + rng() * 1.2; // 1.8–3.0 — very fast convergence
+  const life = 300 + rng() * 500;   // short-lived, arrives quickly
   return {
     sx, sy, tx, ty,
     born: t,
