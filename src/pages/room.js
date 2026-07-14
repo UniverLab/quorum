@@ -2,6 +2,7 @@ import { createProtocol } from '../protocol.js';
 import { getUserId, getUserName, setUserName } from '../identity.js';
 import { computeStats, DECK } from '../state.js';
 import { setCleanup, navigate } from '../router.js';
+import { computeReaction } from '../kaomoji.js';
 
 // Simple markdown renderer
 function renderMd(text) {
@@ -99,7 +100,7 @@ function startRoom(root, roomId, userId, userName) {
   // Leave room
   root.querySelector('#btn-leave').addEventListener('click', () => {
     localStorage.removeItem(`quorum-stories-${roomId}`);
-    navigate('');
+    navigate('/');
   });
 
   // Theme toggle
@@ -117,7 +118,7 @@ function startRoom(root, roomId, userId, userName) {
   // Home logo link
   root.querySelector('#btn-home').addEventListener('click', (e) => {
     e.preventDefault();
-    navigate('');
+    navigate('/');
   });
 
   function onCountdown() {
@@ -165,19 +166,20 @@ function startRoom(root, roomId, userId, userName) {
 
     const cards = mainEl.querySelectorAll('.reveal-card');
 
-    // Phase 1: Start particles IMMEDIATELY
+    // Phase 1: Start particles IMMEDIATELY — but target the CENTERED
+    // position (where cards will be after sliding), not the spread position.
     requestAnimationFrame(() => {
       const overlay = mainEl.querySelector('#reveal-overlay');
       if (overlay && window.startRevealMode) {
         const rect = overlay.getBoundingClientRect();
-        // Get positions of each card for spark pairing
         const cardEls = mainEl.querySelectorAll('.reveal-card');
+        // Temporarily read centered positions by removing the spread transform
         const cardPositions = Array.from(cardEls).map(card => {
-          const cardRect = card.getBoundingClientRect();
-          return {
-            x: cardRect.left + cardRect.width / 2,
-            y: cardRect.top + cardRect.height / 2
-          };
+          const saved = card.style.cssText;
+          card.style.transform = 'none';
+          const r = card.getBoundingClientRect();
+          card.style.cssText = saved;
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
         });
         window.startRevealMode(rect.left + rect.width / 2, rect.top + rect.height / 2, 100, cardPositions);
       }
@@ -189,6 +191,36 @@ function startRoom(root, roomId, userId, userName) {
         setTimeout(() => card.classList.add('slide-to-center'), i * 60);
       });
     });
+
+    // Phase 2b: After slide completes, start vibration.
+    setTimeout(() => {
+      // Start vibration — cards shake with increasing intensity
+      cards.forEach((card, i) => {
+        // Disable CSS transition so inline transform is instant
+        card.style.transition = 'none';
+        let vibrateFrame = 0;
+        const vibrateInterval = setInterval(() => {
+          vibrateFrame++;
+          const intensity = Math.min(vibrateFrame / 20, 1);
+          const dx = (Math.random() - 0.5) * 6 * intensity;
+          const dy = (Math.random() - 0.5) * 6 * intensity;
+          const rot = (Math.random() - 0.5) * 3 * intensity;
+          card.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+        }, 30);
+        // Stop vibration when flip starts (staggered per card)
+        const vibrateDuration = flipStart - slideEnd + 200 + i * 150;
+        setTimeout(() => {
+          clearInterval(vibrateInterval);
+          // Reset to exact center before flip — one frame gap ensures
+          // the browser commits the reset before the flip class fires.
+          card.style.transform = 'translate(0, 0)';
+          requestAnimationFrame(() => {
+            card.style.transform = '';
+            card.style.transition = '';
+          });
+        }, vibrateDuration);
+      });
+    }, slideEnd);
 
     // Phase 3: After particles converge, flip cards
     setTimeout(() => {
@@ -480,16 +512,43 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
         ${peers.map(p => `
           <li class="${p.online === false ? 'offline' : ''}">
             <span class="pdot"></span>
-            ${escHtml(p.name)}${p.id === userId ? ' <span class="you">(you)</span>' : ''}
+            <span class="peer-name-text">${escHtml(p.name)}${p.id === userId ? ' <span class="you">(you)</span>' : ''}</span>
+            ${p.id === userId ? '<button class="btn-edit-name" title="Change name">✎</button>' : ''}
           </li>
         `).join('')}
       </ul>
       ${peers.length === 1 ? `<p class="alone-hint">Share the link above to invite others</p>` : ''}
     `;
+
+    const editBtn = peerList.querySelector('.btn-edit-name');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        const li = editBtn.closest('li');
+        const nameSpan = li.querySelector('.peer-name-text');
+        const currentName = getUserName();
+        nameSpan.innerHTML = `<input class="name-edit-input" type="text" value="${escHtml(currentName)}" maxlength="32" />`;
+        const input = nameSpan.querySelector('input');
+        input.focus();
+        input.select();
+        const save = () => {
+          const newName = input.value.trim();
+          if (newName && newName !== currentName) {
+            setUserName(newName);
+            nameSpan.innerHTML = `<span class="name-saved">${escHtml(newName)} ✓</span>`;
+            setTimeout(() => startRoom(root, roomId, userId, newName), 600);
+          } else {
+            nameSpan.textContent = currentName;
+          }
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') save();
+          if (e.key === 'Escape') { nameSpan.textContent = currentName; }
+        });
+      });
+    }
   }
 }
-
-// ── Phase: voting ─────────────────────────────────────────────────────────────
 
 function renderVoting(el, s, userId, protocol, force) {
   const peers  = Object.values(s.participants);
@@ -584,6 +643,9 @@ function renderRevealed(el, s, userId, protocol, force, roomId) {
   const stats = computeStats(s.votes);
   const hasNextStory = s.stories.length > 0 && s.currentIndex < s.stories.length - 1;
 
+  // Compute reaction
+  const reaction = computeReaction(userId, s.votes, s.participants);
+
   // The reveal spectacle already played in the overlay (onCountdown) —
   // show the results directly, no second charge animation.
   if (force || !el.querySelector('.revealed')) {
@@ -593,6 +655,11 @@ function renderRevealed(el, s, userId, protocol, force, roomId) {
     el.innerHTML = `
       <section class="revealed">
         ${s.storyTitle ? `<h2 class="story-title">${escHtml(s.storyTitle)}</h2>` : ''}
+
+        ${reaction.message ? `<div class="reaction-banner reaction-${reaction.type}">
+          <span class="reaction-kao">${reaction.kaomoji}</span>
+          <span class="reaction-msg">${escHtml(reaction.message)}</span>
+        </div>` : ''}
 
         <div class="revealed-cards">
           ${peers.map(p => {
