@@ -1,5 +1,6 @@
 import { navigate } from '../router.js';
 import { generateRoomId } from '../room-id.js';
+import { BANNER } from '../banner.js';
 
 export function renderHome(root) {
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'espresso';
@@ -8,14 +9,7 @@ export function renderHome(root) {
       <button class="btn-theme home-theme" id="btn-theme" title="Toggle theme">${currentTheme === 'espresso' ? '☀' : '☾'}</button>
       <div class="home-content">
         <div class="home-brand">
-          <pre class="home-banner" aria-hidden="true">██████
-██░░░░░███
-███    ░░███ █████ ████  ██████  ████████  █████ ████ █████████████
-░███     ░███░░███ ░███  ███░░███░░███░░███░░███ ░███ ░░███░░███░░███
-░███   ██░███ ░███ ░███ ░███ ░███ ░███ ░░░  ░███ ░███  ░███ ░███ ░███
-░░███ ░░████  ░███ ░███ ░███ ░███ ░███      ░███ ░███  ░███ ░███ ░███
- ░░░██████░██ ░░████████░░██████  █████     ░░████████ █████░███ █████
-   ░░░░░░ ░░   ░░░░░░░░  ░░░░░░  ░░░░░       ░░░░░░░░ ░░░░░ ░░░ ░░░░░</pre>
+          <pre class="home-banner" aria-hidden="true">${BANNER}</pre>
           <p class="home-subtitle">Planning poker p2p — no accounts, no server.</p>
         </div>
         <div class="home-actions">
