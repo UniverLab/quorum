@@ -1,4 +1,5 @@
-/** Hash-based router — no server config needed for static hosting. */
+/** History-based router — clean URLs (/about instead of /#/about).
+ *  Vite dev server handles SPA fallback; production needs a redirect rule. */
 
 const routes = {};
 let cleanup = null;
@@ -11,8 +12,9 @@ export function setCleanup(fn) {
   cleanup = fn;
 }
 
-export function navigate(hash) {
-  window.location.hash = hash;
+export function navigate(path) {
+  history.pushState(null, '', path);
+  resolve();
 }
 
 function resolve() {
@@ -21,11 +23,18 @@ function resolve() {
     cleanup = null;
   }
 
-  const hash = window.location.hash.slice(1) || '/';
-  const roomMatch = hash.match(/^\/room\/([A-Za-z0-9]+)$/);
+  const path = window.location.pathname || '/';
+  const roomMatch = path.match(/^\/room\/([A-Za-z0-9]+)$/);
+
+  document.body?.classList.toggle('is-room', !!roomMatch);
 
   if (roomMatch) {
     routes['/room/:id']?.(roomMatch[1]);
+    return;
+  }
+
+  if (routes[path]) {
+    routes[path]();
     return;
   }
 
@@ -33,6 +42,18 @@ function resolve() {
 }
 
 export function start() {
-  window.addEventListener('hashchange', resolve);
+  window.addEventListener('popstate', resolve);
+  // Handle link clicks for SPA navigation
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      // Let external links and hash links pass through
+      if (!href || href.startsWith('http') || href.startsWith('#')) return;
+      e.preventDefault();
+      navigate(href);
+    });
+  }
   resolve();
 }

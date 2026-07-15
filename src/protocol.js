@@ -1,9 +1,30 @@
 import { joinRoom } from 'trystero/torrent';
-import { createInitialState, getAllVoted } from './state.js';
+import { createInitialState, getAllVoted, DECK } from './state.js';
 
 const APP_ID         = 'quorum-univerlab-v1';
 const HEARTBEAT_MS   = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
+
+// Abuse limits — a malicious peer can send arbitrary payloads, so every
+// peer-controlled string and collection is bounded before touching state.
+const MAX_ID_LEN    = 64;
+const MAX_NAME_LEN  = 40;
+const MAX_TITLE_LEN = 500;
+const MAX_STORIES   = 300;
+const MAX_PEERS     = 50;
+
+const VALID_PHASES = ['waiting', 'voting', 'revealed'];
+
+const cleanName = (n) =>
+  typeof n === 'string' && n.trim() ? n.trim().slice(0, MAX_NAME_LEN) : 'Anon';
+
+const cleanStories = (arr) =>
+  Array.isArray(arr)
+    ? arr.filter((s) => typeof s === 'string').slice(0, MAX_STORIES).map((s) => s.slice(0, MAX_TITLE_LEN))
+    : [];
+
+const isValidId = (id) => typeof id === 'string' && id.length > 0 && id.length <= MAX_ID_LEN;
+const isCard    = (c) => c == null || DECK.includes(c);
 
 /**
  * @param {string} roomId
@@ -22,7 +43,10 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   state.participants[userId] = { ...self };
   state.votes[userId] = null;
 
-  const room = joinRoom({ appId: APP_ID }, roomId);
+  // `password` derives an encryption key for the signaling payloads relayed
+  // through public trackers: a tracker (or anyone sniffing it) that does not
+  // know the room ID cannot read or tamper with the WebRTC handshake.
+  const room = joinRoom({ appId: APP_ID, password: roomId }, roomId);
 
   const [sendJoin,         getJoin]         = room.makeAction('join');
   const [sendStateSync,    getStateSync]    = room.makeAction('state-sync');
@@ -63,13 +87,15 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   function triggerReveal() {
     if (revealPending) return;
     revealPending = true;
-    onCountdown?.();
+    const result = onCountdown?.();
+    // If onCountdown returns a number (animation duration ms), use it; else 3s fallback
+    const animDuration = typeof result === 'number' ? result : 3_000;
     revealTimeout = setTimeout(() => {
       revealTimeout = null;
       state.phase = 'revealed';
       revealPending = false;
       emit();
-    }, 3_000);
+    }, animDuration);
   }
 
   function checkAutoReveal() {
@@ -82,6 +108,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   // ── Trystero peer lifecycle ───────────────────────────────────────────────
 
   room.onPeerJoin((peerId) => {
+    // Introduce ourselves directly — the new peer needs our peerId→userId
+    // mapping to accept our votes/heartbeats (identity checks below).
+    sendJoin({ participant: self }, peerId);
     // Send current state directly to the new peer
     sendStateSync({ state: snapshot() }, peerId);
   });
@@ -103,12 +132,23 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
   getJoin((data, peerId) => {
     const p = isObj(data) ? data.participant : null;
-    if (!isObj(p) || typeof p.id !== 'string') return;
+    if (!isObj(p) || !isValidId(p.id)) return;
+    // Identity rules: nobody may claim our own id, and an id already bound to
+    // another live connection cannot be hijacked. A binding whose participant
+    // has gone offline is reclaimable (legitimate reconnect).
+    if (p.id === userId) return;
+    for (const [pid, uid] of peerMap) {
+      if (uid === p.id && pid !== peerId) {
+        if (state.participants[p.id]?.online !== false) return;
+        peerMap.delete(pid); // stale binding — reclaim
+      }
+    }
+    // Cap the room size a single peer can inflate.
+    if (!state.participants[p.id] && Object.keys(state.participants).length >= MAX_PEERS) return;
     peerMap.set(peerId, p.id);
     // Build the record from known fields only — never spread peer-controlled
     // keys (a peer could otherwise inject online/lastSeen for others).
-    const name = typeof p.name === 'string' ? p.name : 'Anon';
-    state.participants[p.id] = { id: p.id, name, lastSeen: Date.now(), online: true };
+    state.participants[p.id] = { id: p.id, name: cleanName(p.name), lastSeen: Date.now(), online: true };
     if (state.votes[p.id] === undefined) state.votes[p.id] = null;
     emit();
     // Respond directly to the joiner with latest state
@@ -122,7 +162,28 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
 
     const incoming = isObj(data) ? data.state : null;
     if (!isObj(incoming) || !isObj(incoming.participants) || !isObj(incoming.votes)) return;
-    state = { ...incoming };
+
+    // Rebuild the state field by field — never adopt a peer's object wholesale.
+    const participants = {};
+    for (const p of Object.values(incoming.participants).slice(0, MAX_PEERS)) {
+      if (!isObj(p) || !isValidId(p.id)) continue;
+      participants[p.id] = { id: p.id, name: cleanName(p.name), lastSeen: Date.now(), online: p.online !== false };
+    }
+    const votes = {};
+    for (const id of Object.keys(participants)) {
+      votes[id] = isCard(incoming.votes[id]) ? incoming.votes[id] ?? null : null;
+    }
+    state = {
+      roomId,
+      stories: cleanStories(incoming.stories),
+      currentIndex: Number.isInteger(incoming.currentIndex) ? incoming.currentIndex : -1,
+      storyTitle: typeof incoming.storyTitle === 'string' ? incoming.storyTitle.slice(0, MAX_TITLE_LEN) : '',
+      phase: VALID_PHASES.includes(incoming.phase) ? incoming.phase : 'waiting',
+      votes,
+      participants,
+      roundId: isValidId(incoming.roundId) ? incoming.roundId : crypto.randomUUID(),
+      autoReveal: incoming.autoReveal !== false,
+    };
     // Re-assert self
     state.participants[userId] = { ...self, lastSeen: Date.now(), online: true };
     if (state.votes[userId] === undefined) state.votes[userId] = null;
@@ -130,13 +191,15 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     emit();
   });
 
-  getVote((data) => {
+  getVote((data, peerId) => {
     if (!isObj(data)) return;
     const { participantId, card, roundId } = data;
     if (roundId !== state.roundId) return;
-    // Ignore votes from peers we don't know — no writing arbitrary vote keys.
-    if (!state.participants[participantId]) return;
-    state.votes[participantId] = card;
+    // A peer may only vote as the identity it joined with, and only with a
+    // card from the deck — no writing arbitrary vote keys or values.
+    if (peerMap.get(peerId) !== participantId) return;
+    if (!state.participants[participantId] || !isCard(card)) return;
+    state.votes[participantId] = card ?? null;
     emit();
     checkAutoReveal();
   });
@@ -148,7 +211,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   });
 
   getNextRound((data) => {
-    if (!isObj(data) || typeof data.roundId !== 'string') return;
+    if (!isObj(data) || !isValidId(data.roundId)) return;
     cancelReveal();
     state.roundId = data.roundId;
     state.phase = 'voting';
@@ -157,11 +220,11 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   });
 
   getNewStory((data) => {
-    if (!isObj(data) || typeof data.roundId !== 'string') return;
+    if (!isObj(data) || !isValidId(data.roundId)) return;
     cancelReveal();
     state.roundId = data.roundId;
-    state.currentIndex = typeof data.index === 'number' ? data.index : -1;
-    state.storyTitle = typeof data.title === 'string' ? data.title : '';
+    state.currentIndex = Number.isInteger(data.index) ? data.index : -1;
+    state.storyTitle = typeof data.title === 'string' ? data.title.slice(0, MAX_TITLE_LEN) : '';
     // Mirror the sender's phase: startVoting broadcasts 'voting', newStory
     // broadcasts 'waiting'. Without this every receiver jumped straight into
     // voting while the sender of newStory sat in the waiting screen.
@@ -173,7 +236,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   getStoriesLoad((data) => {
     const stories = isObj(data) ? data.stories : null;
     if (!Array.isArray(stories)) return;
-    state.stories = stories.filter((s) => typeof s === 'string');
+    state.stories = cleanStories(stories);
     state.currentIndex = -1;
     emit();
   });
@@ -184,18 +247,22 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     emit();
   });
 
-  getLeave((data) => {
+  getLeave((data, peerId) => {
     if (!isObj(data)) return;
     const { participantId } = data;
+    // Only the owner of an identity can announce its departure.
+    if (peerMap.get(peerId) !== participantId) return;
     if (state.participants[participantId]) {
       state.participants[participantId] = { ...state.participants[participantId], online: false };
       emit();
     }
   });
 
-  getHeartbeat((data) => {
+  getHeartbeat((data, peerId) => {
     if (!isObj(data)) return;
     const { participantId } = data;
+    // Only the owner of an identity can keep it alive.
+    if (peerMap.get(peerId) !== participantId) return;
     if (state.participants[participantId]) {
       const wasOnline = state.participants[participantId].online !== false;
       state.participants[participantId] = {
@@ -243,6 +310,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.storyTitle = title;
       state.phase = 'voting';
       state.roundId = newRoundId;
+      const idx = state.stories.indexOf(title);
+      state.currentIndex = idx;
+      state.storyId = idx >= 0 ? state.storyIds[idx] : null;
       revealPending = false;
       clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
@@ -287,10 +357,39 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       emit();
     },
 
-    loadStories(text) {
+    nextStory() {
+      const newIndex = state.currentIndex + 1;
+      if (newIndex >= state.stories.length) return;
+      const title = state.stories[newIndex];
+      const newRoundId = crypto.randomUUID();
+      cancelReveal();
+      state.roundId = newRoundId;
+      state.currentIndex = newIndex;
+      state.storyTitle = title;
+      state.phase = 'voting';
+      clearVotes();
+      sendNewStory({ index: newIndex, title, roundId: newRoundId, phase: 'voting' });
+      emit();
+    },
+
+    loadStories(text, newCurrentIndex) {
       const stories = text.split('\n').map(s => s.trim()).filter(Boolean);
+      // Generate IDs for new stories, keep existing ones
+      const newIds = stories.map((s, i) => {
+        // Keep existing ID if story at same index has same title
+        if (state.storyIds[i] && state.stories[i] === s) {
+          return state.storyIds[i];
+        }
+        // Generate new ID for new or changed stories
+        return crypto.randomUUID();
+      });
       state.stories = stories;
-      state.currentIndex = -1;
+      state.storyIds = newIds;
+      if (newCurrentIndex !== undefined) {
+        state.currentIndex = newCurrentIndex;
+      } else {
+        state.currentIndex = -1;
+      }
       sendStoriesLoad({ stories });
       emit();
     },
@@ -298,6 +397,14 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     setAutoReveal(enabled) {
       state.autoReveal = enabled;
       sendAutoReveal({ enabled });
+      emit();
+    },
+
+    backToWaiting() {
+      cancelReveal();
+      state.phase = 'waiting';
+      state.storyTitle = '';
+      state.votes = {};
       emit();
     },
 

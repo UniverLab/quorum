@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// router.js reads/writes window.location.hash — stub it
-function makeLocationStub(initial = '') {
-  let hash = initial;
+function makeLocationStub(pathname = '/') {
   return {
-    get hash() { return hash; },
-    set hash(v) { hash = v; },
+    get pathname() { return pathname; },
+  };
+}
+
+function mockDocument() {
+  return {
+    addEventListener: vi.fn(),
+    body: { classList: { toggle: vi.fn() } },
   };
 }
 
 describe('router — resolve', () => {
   beforeEach(() => {
-    // Reset module between tests so route registry is fresh
     vi.resetModules();
   });
 
-  it('calls the "/" handler for empty hash', async () => {
-    global.window = { location: makeLocationStub(''), addEventListener: vi.fn() };
+  it('calls the "/" handler for root path', async () => {
+    global.window = { location: makeLocationStub('/'), addEventListener: vi.fn(), history: { pushState: vi.fn() } };
+    global.document = mockDocument();
 
     const { register, start } = await import('../router.js');
     const homeFn = vi.fn();
@@ -27,7 +31,8 @@ describe('router — resolve', () => {
   });
 
   it('calls "/room/:id" handler and passes the room ID', async () => {
-    global.window = { location: makeLocationStub('#/room/ABCD1234'), addEventListener: vi.fn() };
+    global.window = { location: makeLocationStub('/room/ABCD1234'), addEventListener: vi.fn(), history: { pushState: vi.fn() } };
+    global.document = mockDocument();
 
     const { register, start } = await import('../router.js');
     const roomFn = vi.fn();
@@ -38,7 +43,8 @@ describe('router — resolve', () => {
   });
 
   it('calls cleanup before resolving a new route', async () => {
-    global.window = { location: makeLocationStub(''), addEventListener: vi.fn() };
+    global.window = { location: makeLocationStub('/'), addEventListener: vi.fn(), history: { pushState: vi.fn() } };
+    global.document = mockDocument();
 
     const { register, setCleanup, start } = await import('../router.js');
     const cleanup = vi.fn();
