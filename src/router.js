@@ -26,7 +26,7 @@ function resolve() {
   const path = window.location.pathname || '/';
   const roomMatch = path.match(/^\/room\/([A-Za-z0-9]+)$/);
 
-  document.body.classList.toggle('is-room', !!roomMatch);
+  document.body?.classList.toggle('is-room', !!roomMatch);
 
   if (roomMatch) {
     routes['/room/:id']?.(roomMatch[1]);
@@ -44,14 +44,16 @@ function resolve() {
 export function start() {
   window.addEventListener('popstate', resolve);
   // Handle link clicks for SPA navigation
-  document.addEventListener('click', (e) => {
-    const link = e.target.closest('a[href]');
-    if (!link) return;
-    const href = link.getAttribute('href');
-    // Let external links and hash links pass through
-    if (!href || href.startsWith('http') || href.startsWith('#')) return;
-    e.preventDefault();
-    navigate(href);
-  });
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+      const href = link.getAttribute('href');
+      // Let external links and hash links pass through
+      if (!href || href.startsWith('http') || href.startsWith('#')) return;
+      e.preventDefault();
+      navigate(href);
+    });
+  }
   resolve();
 }
