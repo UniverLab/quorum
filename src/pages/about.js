@@ -1,6 +1,6 @@
 import { BANNER } from '../banner.js';
 
-const VERSION = '0.1.2';
+const VERSION = '0.1.3';
 
 const FEATURES = [
   { title: 'Planning poker', desc: 'Fibonacci deck (0, 1, 2, 3, 5, 8, 13, 21, ☕). Cards auto-reveal when everyone has voted — no surprises.' },
