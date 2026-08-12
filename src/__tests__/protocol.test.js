@@ -284,6 +284,82 @@ describe('protocol — round management', () => {
   });
 });
 
+// ── Rename ────────────────────────────────────────────────────────────────────
+// Peers learn names from the join handshake, so a rename after joining needs
+// its own event — otherwise everyone else keeps showing the name from the join.
+
+describe('protocol — rename', () => {
+  let proto, updates;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ proto, updates } = await makeProtocol('u1', 'Alice'));
+    vi.advanceTimersByTime(1);
+  });
+
+  afterEach(() => { proto.destroy(); vi.useRealTimers(); });
+
+  it('setName updates our own participant record and broadcasts it', () => {
+    proto.setName('Alicia');
+    expect(latest(updates).participants['u1'].name).toBe('Alicia');
+    expect(mockRoom.getSend('rename')).toHaveBeenCalledWith({ participantId: 'u1', name: 'Alicia' });
+  });
+
+  it('a rename mid-round survives into the voting phase', () => {
+    proto.startVoting('Story');
+    proto.setName('Alicia');
+    proto.vote('5');
+    const s = latest(updates);
+    expect(s.phase).toBe('voting');
+    expect(s.participants['u1'].name).toBe('Alicia');
+    expect(s.votes['u1']).toBe('5');
+  });
+
+  it('carries the new name in later joins and state-syncs', () => {
+    proto.setName('Alicia');
+    mockRoom.triggerPeerJoin('peer-u2');
+    expect(mockRoom.getSend('join')).toHaveBeenLastCalledWith(
+      { participant: expect.objectContaining({ id: 'u1', name: 'Alicia' }) },
+      'peer-u2',
+    );
+    const [[{ state: synced }]] = mockRoom.getSend('state-sync').mock.calls;
+    expect(synced.participants['u1'].name).toBe('Alicia');
+  });
+
+  it('applies an incoming rename from the peer that owns the identity', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Bob') }, 'peer-u2');
+    mockRoom.triggerAction('rename', { participantId: 'u2', name: 'Bobby' }, 'peer-u2');
+    expect(latest(updates).participants['u2'].name).toBe('Bobby');
+  });
+
+  it('keeps a renamed peer vote-able — the record is keyed by id, not name', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Bob') }, 'peer-u2');
+    proto.startVoting('Story');
+    mockRoom.triggerAction('rename', { participantId: 'u2', name: 'Bobby' }, 'peer-u2');
+    const roundId = latest(updates).roundId;
+    mockRoom.triggerAction('vote', { participantId: 'u2', card: '8', roundId }, 'peer-u2');
+    const s = latest(updates);
+    expect(s.votes['u2']).toBe('8');
+    expect(s.participants['u2'].name).toBe('Bobby');
+  });
+
+  it('rejects a rename sent on behalf of another participant', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Bob') }, 'peer-u2');
+    mockRoom.triggerAction('rename', { participantId: 'u2', name: 'Impostor' }, 'peer-evil');
+    expect(latest(updates).participants['u2'].name).toBe('Bob');
+  });
+
+  it('sanitizes an incoming rename payload', () => {
+    mockRoom.triggerAction('join', { participant: mkPeer('u2', 'Bob') }, 'peer-u2');
+    mockRoom.triggerAction('rename', { participantId: 'u2', name: 'z'.repeat(10_000) }, 'peer-u2');
+    expect(latest(updates).participants['u2'].name.length).toBeLessThanOrEqual(40);
+
+    mockRoom.triggerAction('rename', { participantId: 'u2', name: '   ' }, 'peer-u2');
+    expect(latest(updates).participants['u2'].name).toBe('Anon');
+  });
+});
+
 // ── Zombie detection ──────────────────────────────────────────────────────────
 
 describe('protocol — zombie detection', () => {

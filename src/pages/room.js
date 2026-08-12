@@ -530,12 +530,17 @@ function renderWaiting(el, s, userId, protocol, force, roomId) {
         const input = nameSpan.querySelector('input');
         input.focus();
         input.select();
+        let done = false;
         const save = () => {
+          if (done) return;
+          done = true;
           const newName = input.value.trim();
           if (newName && newName !== currentName) {
             setUserName(newName);
             nameSpan.innerHTML = `<span class="name-saved">${escHtml(newName)} ✓</span>`;
-            setTimeout(() => startRoom(root, roomId, userId, newName), 600);
+            // Tell the protocol (and through it every peer) about the new name;
+            // the resulting emit re-renders the peer list and the desk.
+            setTimeout(() => protocol.setName(newName), 600);
           } else {
             nameSpan.textContent = currentName;
           }

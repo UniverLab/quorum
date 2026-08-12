@@ -51,6 +51,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
   const [sendJoin,         getJoin]         = room.makeAction('join');
   const [sendStateSync,    getStateSync]    = room.makeAction('state-sync');
   const [sendVote,         getVote]         = room.makeAction('vote');
+  const [sendRename,       getRename]       = room.makeAction('rename');
   const [sendReveal,       getReveal]       = room.makeAction('reveal');
   const [sendNextRound,    getNextRound]    = room.makeAction('next-round');
   const [sendNewStory,     getNewStory]     = room.makeAction('new-story');
@@ -204,6 +205,19 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     checkAutoReveal();
   });
 
+  getRename((data, peerId) => {
+    if (!isObj(data)) return;
+    const { participantId, name } = data;
+    // Only the owner of an identity may rename it — same rule as vote/leave.
+    if (peerMap.get(peerId) !== participantId) return;
+    if (!state.participants[participantId]) return;
+    state.participants[participantId] = {
+      ...state.participants[participantId],
+      name: cleanName(name),
+    };
+    emit();
+  });
+
   getReveal((data) => {
     if (!isObj(data)) return;
     if (data.roundId !== state.roundId || state.phase !== 'voting') return;
@@ -316,6 +330,20 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       revealPending = false;
       clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
+      emit();
+    },
+
+    /**
+     * Rename ourselves in place. Peers learn names from the join handshake
+     * only, so a rename has to travel on its own event — and `self` must be
+     * updated too, since it is what later joins and state-syncs carry.
+     */
+    setName(name) {
+      const clean = cleanName(name);
+      if (clean === self.name) return;
+      self.name = clean;
+      state.participants[userId] = { ...state.participants[userId], name: clean };
+      sendRename({ participantId: userId, name: clean });
       emit();
     },
 
