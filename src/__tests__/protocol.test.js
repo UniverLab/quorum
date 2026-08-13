@@ -486,15 +486,119 @@ describe('protocol — stories list', () => {
     expect(s.currentIndex).toBe(-1);
   });
 
-  it('loadStories broadcasts stories-load event', () => {
+  it('loadStories broadcasts stories-load event with the IDs', () => {
     proto.loadStories('X\nY');
-    expect(mockRoom.getSend('stories-load')).toHaveBeenCalledWith({ stories: ['X', 'Y'] });
+    const [[payload]] = mockRoom.getSend('stories-load').mock.calls;
+    expect(payload.stories).toEqual(['X', 'Y']);
+    expect(payload.storyIds).toEqual(latest(updates).storyIds);
   });
 
   it('incoming stories-load updates list', () => {
     mockRoom.triggerAction('stories-load', { stories: ['Remote A', 'Remote B'] });
     const s = latest(updates);
     expect(s.stories).toEqual(['Remote A', 'Remote B']);
+  });
+});
+
+// ── Story IDs ─────────────────────────────────────────────────────────────────
+//
+// Results are keyed by story ID, so an ID that goes missing or slips out of
+// alignment silently attaches a round's outcome to the wrong story — or throws
+// on a list that is `undefined`.
+
+describe('protocol — story IDs', () => {
+  let proto, updates;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ proto, updates } = await makeProtocol());
+    vi.advanceTimersByTime(1);
+  });
+
+  afterEach(() => { proto.destroy(); vi.useRealTimers(); });
+
+  it('keeps one ID per story', () => {
+    proto.loadStories('A\nB\nC');
+    const s = latest(updates);
+    expect(s.storyIds).toHaveLength(3);
+    expect(new Set(s.storyIds).size).toBe(3);
+  });
+
+  it('derives storyId from the story being voted on', () => {
+    proto.loadStories('A\nB');
+    const { storyIds } = latest(updates);
+    proto.startVoting('B');
+    expect(latest(updates).storyId).toBe(storyIds[1]);
+  });
+
+  it('follows the story across nextStory, which never set storyId', () => {
+    proto.loadStories('A\nB');
+    const { storyIds } = latest(updates);
+    proto.startVoting('A');
+    proto.nextStory();
+    expect(latest(updates).storyId).toBe(storyIds[1]);
+  });
+
+  it('reports no storyId while no story is selected', () => {
+    expect(latest(updates).storyId).toBeNull();
+  });
+
+  it('adopts the IDs carried by a stories-load', () => {
+    mockRoom.triggerAction('stories-load', {
+      stories: ['Remote A', 'Remote B'],
+      storyIds: ['id-a', 'id-b'],
+    });
+    expect(latest(updates).storyIds).toEqual(['id-a', 'id-b']);
+  });
+
+  it('survives a state-sync — the regression: storyIds arrived undefined', () => {
+    mockRoom.triggerAction('state-sync', {
+      state: {
+        roomId: 'ROOM-TEST',
+        stories: ['Auth flow', 'Billing'],
+        storyIds: ['id-auth', 'id-billing'],
+        currentIndex: 1,
+        storyTitle: 'Billing',
+        phase: 'voting',
+        votes: {},
+        participants: { 'u9': mkPeer('u9', 'Zoe') },
+        roundId: 'r1',
+        autoReveal: true,
+      },
+    });
+    const s = latest(updates);
+    expect(s.storyIds).toEqual(['id-auth', 'id-billing']);
+    expect(s.storyId).toBe('id-billing');
+    // Every path that indexes storyIds used to throw on `undefined`.
+    expect(() => proto.startVoting('Auth flow')).not.toThrow();
+    expect(latest(updates).storyId).toBe('id-auth');
+  });
+
+  it('fills in IDs a peer omitted rather than leaving the arrays ragged', () => {
+    mockRoom.triggerAction('stories-load', { stories: ['A', 'B', 'C'] });
+    const s = latest(updates);
+    expect(s.storyIds).toHaveLength(3);
+    expect(s.storyIds.every(id => typeof id === 'string' && id.length > 0)).toBe(true);
+  });
+
+  it('replaces an unusable ID in place, keeping later stories aligned', () => {
+    mockRoom.triggerAction('stories-load', {
+      stories: ['A', 'B', 'C'],
+      storyIds: ['id-a', 42, 'id-c'],
+    });
+    const s = latest(updates);
+    expect(s.storyIds).toHaveLength(3);
+    expect(s.storyIds[0]).toBe('id-a');
+    expect(s.storyIds[2]).toBe('id-c');
+  });
+
+  it('truncates IDs a peer sent in excess of the stories', () => {
+    mockRoom.triggerAction('stories-load', {
+      stories: ['A'],
+      storyIds: ['id-a', 'id-b', 'id-c'],
+    });
+    expect(latest(updates).storyIds).toEqual(['id-a']);
   });
 });
 
