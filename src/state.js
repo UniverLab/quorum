@@ -5,10 +5,12 @@ export function createInitialState(roomId) {
   return {
     roomId,
     stories: [],
+    // Parallel to `stories`, same length: storyIds[i] identifies stories[i].
+    // `storyId` is not stored — it is derived from currentIndex on read, so it
+    // can never drift out of step with the story actually being voted on.
     storyIds: [],
     currentIndex: -1,
     storyTitle: '',
-    storyId: null,
     phase: 'waiting',
     votes: {},
     participants: {},

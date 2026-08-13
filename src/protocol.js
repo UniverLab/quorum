@@ -24,6 +24,16 @@ const cleanStories = (arr) =>
     : [];
 
 const isValidId = (id) => typeof id === 'string' && id.length > 0 && id.length <= MAX_ID_LEN;
+
+// Story IDs index `stories` positionally, so the two arrays must stay the same
+// length whatever a peer sends. Anything unusable is replaced, never dropped —
+// dropping would shift every later ID onto the wrong story.
+const cleanStoryIds = (arr, count) => {
+  const src = Array.isArray(arr) ? arr : [];
+  return Array.from({ length: count }, (_, i) =>
+    isValidId(src[i]) ? src[i] : crypto.randomUUID());
+};
+
 const isCard    = (c) => c == null || DECK.includes(c);
 
 /**
@@ -68,6 +78,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       ...state,
       participants: { ...state.participants },
       votes: { ...state.votes },
+      // Derived, never stored: whichever story currentIndex points at. Kept as
+      // a field only because consumers read it to key saved results.
+      storyId: state.storyIds[state.currentIndex] ?? null,
     };
   }
 
@@ -174,9 +187,11 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     for (const id of Object.keys(participants)) {
       votes[id] = isCard(incoming.votes[id]) ? incoming.votes[id] ?? null : null;
     }
+    const stories = cleanStories(incoming.stories);
     state = {
       roomId,
-      stories: cleanStories(incoming.stories),
+      stories,
+      storyIds: cleanStoryIds(incoming.storyIds, stories.length),
       currentIndex: Number.isInteger(incoming.currentIndex) ? incoming.currentIndex : -1,
       storyTitle: typeof incoming.storyTitle === 'string' ? incoming.storyTitle.slice(0, MAX_TITLE_LEN) : '',
       phase: VALID_PHASES.includes(incoming.phase) ? incoming.phase : 'waiting',
@@ -251,6 +266,9 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
     const stories = isObj(data) ? data.stories : null;
     if (!Array.isArray(stories)) return;
     state.stories = cleanStories(stories);
+    // The IDs travel with the stories they belong to. Rebuilding them locally
+    // would leave every peer keying results by a different ID.
+    state.storyIds = cleanStoryIds(data.storyIds, state.stories.length);
     state.currentIndex = -1;
     emit();
   });
@@ -324,9 +342,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       state.storyTitle = title;
       state.phase = 'voting';
       state.roundId = newRoundId;
-      const idx = state.stories.indexOf(title);
-      state.currentIndex = idx;
-      state.storyId = idx >= 0 ? state.storyIds[idx] : null;
+      state.currentIndex = state.stories.indexOf(title);
       revealPending = false;
       clearVotes();
       sendNewStory({ index: state.currentIndex, title, roundId: newRoundId, phase: 'voting' });
@@ -418,7 +434,7 @@ export function createProtocol(roomId, userId, userName, onUpdate, onCountdown) 
       } else {
         state.currentIndex = -1;
       }
-      sendStoriesLoad({ stories });
+      sendStoriesLoad({ stories, storyIds: newIds });
       emit();
     },
 

@@ -290,6 +290,9 @@ function loadStoriesFromStorage(roomId) {
 }
 
 function saveResultToStorage(roomId, storyId, storyTitle, votes) {
+  // Results are looked up by story ID. A round with no story behind it — voting
+  // started before any list was loaded — would write an entry nothing can read.
+  if (!storyId) return;
   const key = `quorum-results-${roomId}`;
   const existing = JSON.parse(localStorage.getItem(key) || '[]');
   const stats = computeStats(votes);
