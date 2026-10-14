@@ -13,7 +13,7 @@
   <a href="https://github.com/UniverLab/quorum/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/UniverLab/quorum/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI"/></a>
   <a href="https://quorum.univerlab.org"><img src="https://img.shields.io/badge/Live-quorum.univerlab.org-E6B24A?style=for-the-badge" alt="Live"/></a>
   <img src="https://img.shields.io/badge/Status-Active-27AE60?style=for-the-badge" alt="Status"/>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-2E8B57?style=for-the-badge" alt="License"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-2E8B57?style=for-the-badge" alt="License"/></a>
 </p>
 
 Browser-native planning poker for agile teams. No accounts, no server — share a room URL and estimate together. Peers talk to each other directly over WebRTC; your votes never touch a server.
