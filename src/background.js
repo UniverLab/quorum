@@ -1,9 +1,9 @@
 // Fibonacci spiral background — golden ratio tiling with per-peer sparks
 const K = Math.log(1.618) / (Math.PI / 2);
-const COLOR_NIGHT = '#e6b24a';
-const COLOR_DAY = '#c4922a';
-const BG_NIGHT = '#241a12';
-const BG_DAY = '#f0e8da';
+const COLOR_NIGHT = '#d6ad5a';
+const COLOR_DAY = '#b58d39';
+const BG_NIGHT = '#201a16';
+const BG_DAY = '#ece7de';
 
 function getColor() {
   return document.documentElement.getAttribute('data-theme') === 'arena'

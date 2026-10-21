@@ -17,8 +17,8 @@ const footer = document.createElement('footer');
 footer.className = 'site-footer';
 footer.innerHTML = `
   <picture class="colophon-band">
-    <source type="image/avif" srcset="/colophon/quorum-band-768.avif 768w, /colophon/quorum-band-1344.avif 1344w" sizes="100vw">
-    <img src="/colophon/quorum-band-1344.webp" srcset="/colophon/quorum-band-768.webp 768w, /colophon/quorum-band-1344.webp 1344w" sizes="100vw" width="1344" height="768" alt="" loading="lazy" decoding="async">
+    <source type="image/avif" srcset="/colophon/frieze-960.avif 960w, /colophon/frieze-1920.avif 1920w" sizes="100vw">
+    <img src="/colophon/frieze-1920.webp" srcset="/colophon/frieze-960.webp 960w, /colophon/frieze-1920.webp 1920w" sizes="100vw" width="1920" height="608" alt="" loading="lazy" decoding="async">
   </picture>
   <div class="colophon-content">
     <div class="colophon-brand">
