@@ -1,13 +1,6 @@
-```
-    ██████                                                            
-  ███░░░░███                                                          
- ███    ░░███ █████ ████  ██████  ████████  █████ ████ █████████████  
-░███     ░███░░███ ░███  ███░░███░░███░░███░░███ ░███ ░░███░░███░░███ 
-░███   ██░███ ░███ ░███ ░███ ░███ ░███ ░░░  ░███ ░███  ░███ ░███ ░███ 
-░░███ ░░████  ░███ ░███ ░███ ░███ ░███      ░███ ░███  ░███ ░███ ░███ 
- ░░░██████░██ ░░████████░░██████  █████     ░░████████ █████░███ █████
-   ░░░░░░ ░░   ░░░░░░░░  ░░░░░░  ░░░░░       ░░░░░░░░ ░░░░░ ░░░ ░░░░░ 
-```                                                                  
+<p align="center">
+  <img src="https://raw.githubusercontent.com/UniverLab/.github/main/assets/banner-quorum.svg" alt="Quorum"/>
+</p>
 
 <p align="center">
   <a href="https://github.com/UniverLab/quorum/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/UniverLab/quorum/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI"/></a>

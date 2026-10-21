@@ -12,6 +12,23 @@
   font-display: block;
 }
 
+/* Old Standard TT — the UniverLab colophon face (OFL, see public/fonts). */
+@font-face {
+  font-family: 'Old Standard TT';
+  src: url('/fonts/OldStandard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Old Standard TT';
+  src: url('/fonts/OldStandard-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* Espresso by default — the card table under a lamp, matching the landing:
    warm dark-brown ground, cream ink, amber cards. */
 :root {
@@ -1248,83 +1265,120 @@ html[data-theme='arena'] .home-banner {
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 
 .site-footer {
+  position: relative;
+  overflow: hidden;
   background: #000;
   color: var(--f-ink);
   border-top: 1px solid #1a1a1a;
-  position: relative;
   z-index: 1;
 }
 
-.site-footer svg { color: var(--f-ink-faint); }
+/* Engraved band across the top; it sinks into the ink before the text. */
+.colophon-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 16rem;
+  opacity: 0.8;
+  -webkit-mask-image: linear-gradient(180deg, #000 10%, transparent 78%);
+  mask-image: linear-gradient(180deg, #000 10%, transparent 78%);
+}
 
-.footer-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1.5rem;
-  max-width: 56rem;
+.colophon-band img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The plate is an object on pure black: show it whole, centred, and let
+     the black sides meet the footer's ink. */
+  object-fit: contain;
+  object-position: 50% 0;
+}
+
+.colophon-content {
+  position: relative;
+  max-width: 72rem;
   margin: 0 auto;
-  padding: 1.4rem 1.5rem;
+  padding: 12rem max(1.5rem, env(safe-area-inset-right)) 2rem max(1.5rem, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
 }
 
-.footer-left {
-  display: flex;
-  align-items: center;
+.colophon-brand { grid-column: 1 / -1; display: grid; gap: 0.6rem; }
+
+.colophon-title {
+  margin: 0;
+  font-family: "Old Standard TT", Georgia, serif;
+  font-weight: 400;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--f-ink);
 }
 
-.footer-mark {
-  display: inline-flex;
-  line-height: 0;
-  color: var(--f-ink-faint);
-  text-decoration: none;
-  transition: color 0.15s ease;
-}
-.footer-mark:hover { color: var(--f-ink-dim); }
-
-.footer-nav {
-  display: flex;
-  gap: 1.4rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.footer-nav a {
-  text-decoration: none;
+.colophon-sub,
+.colophon-label,
+.colophon-credits {
+  margin: 0;
+  font-family: var(--font-mono);
   color: var(--f-ink-dim);
-  font-family: var(--font-mono);
+}
+
+.colophon-sub { font-size: 0.75rem; }
+
+.colophon-label {
   font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: color 0.15s ease;
 }
-.footer-nav a:hover { color: var(--f-ink); }
 
-.footer-base {
-  max-width: 56rem;
-  margin: 0 auto;
-  padding: 0 1.5rem 1rem;
+.colophon-col {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.colophon-col a,
+.colophon-credits a {
+  color: var(--f-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--f-ink) 40%, transparent);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.colophon-col a {
+  width: fit-content;
+  min-height: 32px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  font-family: "Old Standard TT", Georgia, serif;
+  font-size: 1.15rem;
 }
 
-.footer-privacy {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.1em;
-  color: var(--f-ink-faint);
+.colophon-col a:hover,
+.colophon-credits a:hover { text-decoration-color: #e6b24a; }
+
+.colophon-credits {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 1.2rem;
+  font-size: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--f-ink) 25%, transparent);
 }
 
-.footer-word {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.28em;
-  color: var(--f-ink-faint);
-}
+.colophon-credits img { flex: none; }
 
-@media (max-width: 40rem) {
-  .footer-inner { flex-direction: column; gap: 1rem; align-items: flex-start; }
-  .footer-base { flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+@media (min-width: 768px) {
+  .colophon-band { height: 21rem; }
+  .colophon-content {
+    grid-template-columns: 2fr 1fr 1fr;
+    padding-top: 16rem;
+  }
+  .colophon-brand { grid-column: auto; }
+  .colophon-title { font-size: 2.4rem; }
 }
 
 /* ── About page ────────────────────────────────────────────────────────── */
