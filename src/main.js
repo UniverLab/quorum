@@ -16,6 +16,17 @@ register('/about', () => renderAbout(root));
 const footer = document.createElement('footer');
 footer.className = 'site-footer';
 footer.innerHTML = `
+  <div class="colophon">
+    <picture>
+      <source type="image/avif" srcset="/colophon/quorum-night-450.avif 1x, /colophon/quorum-night-900.avif 2x">
+      <img class="colophon-plate" src="/colophon/quorum-night-450.webp" srcset="/colophon/quorum-night-450.webp 1x, /colophon/quorum-night-900.webp 2x" width="370" height="450" alt="The Quorum ballot counter, engraved" loading="lazy" decoding="async">
+    </picture>
+    <div class="colophon-seal">
+      <img class="colophon-wax" src="/colophon/sello-lacre.svg" width="56" height="56" alt="" aria-hidden="true">
+      <small>EXP-008 · Quorum</small>
+      <strong>Artifact conceived and forged at UniverLab</strong>
+    </div>
+  </div>
   <div class="footer-inner">
     <div class="footer-left">
       <a class="footer-mark" href="https://univerlab.org" target="_blank" rel="noopener noreferrer" aria-label="UniverLab">
