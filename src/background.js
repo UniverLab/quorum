@@ -56,6 +56,7 @@ function init() {
   dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   resize();
   window.addEventListener('resize', resize);
+  window.addEventListener('pointermove', (e) => traceAt(e.clientX, e.clientY), { passive: true });
   animate();
 }
 
@@ -65,6 +66,12 @@ function resize() {
   canvas.width = Math.floor(w * dpr);
   canvas.height = Math.floor(h * dpr);
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!plate) {
+    plate = document.createElement('canvas'); pc = plate.getContext('2d');
+    trace = document.createElement('canvas'); tc = trace.getContext('2d');
+  }
+  plate.width = trace.width = canvas.width;
+  plate.height = trace.height = canvas.height;
 }
 
 // Whirling squares tiling
@@ -248,6 +255,113 @@ function drawParticles(t, color) {
   }
 }
 
+// ── The board: the golden tiling is the deck ─────────────────────────────
+// The tiling's squares measure 1, 1, 2, 3, 5, 8, 13, 21, 34: Quorum's Fibonacci deck. At rest the
+// board is the plain spiral and squares. Where the cursor passes, the draughtsman's plate shows
+// through (each square's number, corner points, midpoint ticks) and fades back after a while.
+// On reveal the voted squares take a faint wash of the accent. Votes are never shown before the
+// reveal: room.js only passes them in the 'revealed' phase.
+const SQUARE_OF = { 1: 1, 2: 2, 3: 3, 5: 4, 8: 5, 13: 6, 21: 7 };   // card value → tiling.squares index
+const TRACE_RADIUS = 150, TRACE_DRY = 0.008;
+const board = { phase: 'waiting', lit: new Map(), litAt: 0, consensus: null };
+let plate, pc, trace, tc;   // offscreen: the draughtsman's plate, and where the cursor has passed
+
+/** Call from room.js on every state update. `votes` only in the 'revealed' phase. */
+window.setQuorumBoard = function (phase, votes) {
+  if (phase !== 'revealed') { board.lit.clear(); board.consensus = null; }
+  if (phase === 'revealed' && votes && board.phase !== 'revealed') {
+    const nums = Object.values(votes).filter((v) => v != null && SQUARE_OF[v] != null);
+    board.lit.clear();
+    for (const v of nums) board.lit.set(SQUARE_OF[v], (board.lit.get(SQUARE_OF[v]) || 0) + 1);
+    board.litAt = performance.now();
+    board.consensus = nums.length > 1 && nums.every((v) => v === nums[0]) ? SQUARE_OF[nums[0]] : null;
+  }
+  board.phase = phase;
+};
+
+function traceAt(x, y) {
+  if (!tc) return;
+  tc.setTransform(dpr, 0, 0, dpr, 0, 0);
+  tc.globalCompositeOperation = 'source-over';
+  const g = tc.createRadialGradient(x, y, 0, x, y, TRACE_RADIUS);
+  g.addColorStop(0, 'rgba(0,0,0,0.35)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  tc.fillStyle = g;
+  tc.fillRect(x - TRACE_RADIUS, y - TRACE_RADIUS, TRACE_RADIUS * 2, TRACE_RADIUS * 2);
+}
+
+function drawBoard(t, toX, toY, S, A, day) {
+  const base = revealMode ? (day ? 0.34 : 0.22) : (day ? 0.24 : 0.12);
+  const lit = Math.min(1, (t - board.litAt) / 700);
+
+  // At rest: the squares, with a faint wash on the voted ones after a reveal.
+  tiling.squares.forEach((q, k) => {
+    const x = toX(q.x), y = toY(q.y), side = q.s * S;
+    const votes = board.lit.get(k) || 0;
+    if (votes) {
+      c.fillStyle = A;
+      c.globalAlpha = lit * (k === board.consensus ? (day ? 0.14 : 0.11) : Math.min(day ? 0.1 : 0.08, 0.03 + 0.02 * votes));
+      c.fillRect(x, y, side, side);
+    }
+    c.strokeStyle = A; c.lineWidth = 1; c.globalAlpha = base;
+    c.strokeRect(x, y, side, side);
+  });
+
+  // The draughtsman's plate, drawn offscreen and shown only where the cursor has been.
+  if (pc) {
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.clearRect(0, 0, plate.width, plate.height);
+    pc.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pc.strokeStyle = A; pc.fillStyle = A; pc.lineWidth = 1; pc.globalAlpha = 1;
+    tiling.squares.forEach((q) => {
+      const x = toX(q.x), y = toY(q.y), side = q.s * S;
+      for (const [cx, cy] of [[x, y], [x + side, y], [x, y + side], [x + side, y + side]]) { pc.beginPath(); pc.arc(cx, cy, 1.4, 0, Math.PI * 2); pc.fill(); }
+      const tk = Math.min(6, side * 0.06);
+      pc.beginPath();
+      pc.moveTo(x + side / 2, y - tk); pc.lineTo(x + side / 2, y + tk);
+      pc.moveTo(x + side / 2, y + side - tk); pc.lineTo(x + side / 2, y + side + tk);
+      pc.moveTo(x - tk, y + side / 2); pc.lineTo(x + tk, y + side / 2);
+      pc.moveTo(x + side - tk, y + side / 2); pc.lineTo(x + side + tk, y + side / 2);
+      pc.stroke();
+      const fs = Math.min(15, side * 0.09);
+      if (fs >= 9) {
+        pc.font = `italic ${fs}px "Old Standard TT", Georgia, serif`;
+        pc.textBaseline = 'top';
+        pc.fillText(String(q.s), x + fs * 0.5, y + fs * 0.4);
+      }
+    });
+    tc.setTransform(1, 0, 0, 1, 0, 0);
+    tc.globalCompositeOperation = 'destination-out';
+    tc.fillStyle = `rgba(0,0,0,${TRACE_DRY})`;
+    tc.fillRect(0, 0, trace.width, trace.height);
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.globalCompositeOperation = 'destination-in';
+    pc.drawImage(trace, 0, 0);
+    pc.globalCompositeOperation = 'source-over';
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = day ? 0.55 : 0.45;
+    c.drawImage(plate, 0, 0);
+    c.restore();
+  }
+
+  // The golden spiral, as it always was.
+  c.lineCap = 'round';
+  c.strokeStyle = A;
+  c.lineWidth = day ? 1.6 : 1.3;
+  c.globalAlpha = revealMode ? (day ? 0.38 : 0.25) : (day ? 0.27 : 0.12);
+  c.beginPath();
+  for (let i = 0; i <= 220; i++) {
+    const th = (i / 220) * thMax;
+    const r = rMin * Math.exp(K * th);
+    const x = toX(pu + r * Math.cos(th));
+    const y = toY(pv + r * Math.sin(th));
+    i ? c.lineTo(x, y) : c.moveTo(x, y);
+  }
+  c.stroke();
+  c.globalAlpha = 1;
+}
+
 // ── Animation loop ─────────────────────────────────────────────────────────
 
 function getSparkPos(sp, t) {
@@ -283,27 +397,7 @@ function animate(t) {
   const toX = (u) => ox + u * S;
   const toY = (v) => oy + v * S;
 
-  // Whirling squares — brighter during reveal
-  c.strokeStyle = A;
-  c.lineWidth = 1;
-  c.globalAlpha = revealMode ? (day ? 0.34 : 0.22) : (day ? 0.24 : 0.12);
-  for (const q of tiling.squares) {
-    c.strokeRect(toX(q.x), toY(q.y), q.s * S, q.s * S);
-  }
-
-  // Golden spiral — brighter during reveal
-  c.lineCap = 'round';
-  c.lineWidth = day ? 1.6 : 1.3;
-  c.globalAlpha = revealMode ? (day ? 0.38 : 0.25) : (day ? 0.27 : 0.12);
-  c.beginPath();
-  for (let i = 0; i <= 220; i++) {
-    const th = (i / 220) * thMax;
-    const r = rMin * Math.exp(K * th);
-    const x = toX(pu + r * Math.cos(th));
-    const y = toY(pv + r * Math.sin(th));
-    i ? c.lineTo(x, y) : c.moveTo(x, y);
-  }
-  c.stroke();
+  drawBoard(t, toX, toY, S, A, day);
 
   // Reveal mode: update particles (sparks keep original spiral path)
   if (revealMode) {

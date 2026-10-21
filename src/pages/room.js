@@ -68,8 +68,8 @@ function startRoom(root, roomId, userId, userName) {
       <header class="room-header">
         <a href="#" class="room-logo-link" id="btn-home">
           <svg class="room-logo-icon" width="28" height="28" viewBox="0 0 32 32">
-            <rect width="32" height="32" rx="5" fill="var(--logo-bg)"/>
-            <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="var(--logo-fg)">Q</text>
+            <rect width="32" height="32" rx="3" fill="var(--logo-bg)"/>
+            <path fill="var(--logo-fg)" d="M17.66 23.72Q16.69 23.99 16 23.99Q13.76 23.99 11.98 22.55Q10.2 21.1 9.22 18.78Q8.25 16.45 8.25 13.89Q8.25 11.35 9.24 9.06Q10.23 6.78 11.99 5.39Q13.76 4 16 4Q18.24 4 20.01 5.39Q21.77 6.78 22.76 9.06Q23.75 11.35 23.75 13.89Q23.75 16.8 22.61 19.26Q21.48 21.72 19.34 23Q19.63 24.39 20.16 25.23Q20.68 26.08 21.53 26.08Q22.55 26.08 22.9 24.99Q23.24 23.91 23.24 22.17H23.75Q23.75 24.87 23.12 26.44Q22.49 28 20.68 28Q19.07 28 18.43 26.8Q17.79 25.59 17.66 23.72ZM13.46 22.25Q13.33 21.93 13.33 21.51Q13.33 20.38 14.08 19.66Q14.82 18.94 15.92 18.94Q17.18 18.94 17.92 19.74Q18.67 20.54 19.02 21.83Q20.04 20.78 20.48 18.81Q20.92 16.83 20.92 13.89Q20.92 9.53 19.78 7.19Q18.65 4.86 16 4.86Q13.35 4.86 12.22 7.19Q11.08 9.53 11.08 13.89Q11.08 16.64 11.56 18.86Q12.04 21.08 13.43 22.28ZM17.58 22.84Q17.5 21.48 17.15 20.64Q16.8 19.8 15.84 19.8Q15.14 19.8 14.69 20.26Q14.24 20.73 14.24 21.53Q14.24 23.14 16 23.14Q16.86 23.14 17.58 22.84Z"/>
           </svg>
           <span class="room-logo">Quorum</span>
         </a>
@@ -254,6 +254,8 @@ function startRoom(root, roomId, userId, userName) {
     if (window.setQuorumPeers) {
       window.setQuorumPeers(Object.values(s.participants));
     }
+    // The board lights the voted squares only once the votes are public.
+    window.setQuorumBoard?.(s.phase, s.phase === 'revealed' ? s.votes : null);
 
     // If the reveal animation is running, don't clobber it
     if (animating) return;
@@ -667,6 +669,7 @@ function renderRevealed(el, s, userId, protocol, force, roomId) {
         ${reaction.message ? `<div class="reaction-banner reaction-${reaction.type}">
           <span class="reaction-kao">${reaction.kaomoji}</span>
           <span class="reaction-msg">${escHtml(reaction.message)}</span>
+          ${reaction.type === 'consensus' ? '<img class="reaction-seal" src="/colophon/sello-lacre.svg" alt="" width="52" height="52">' : ''}
         </div>` : ''}
 
         <div class="revealed-cards">
