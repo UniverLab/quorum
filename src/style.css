@@ -29,6 +29,40 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Old Standard TT';
+  src: url('/fonts/OldStandard-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* EB Garamond and Sometype Mono, self-hosted (OFL, see public/fonts) so no
+   visitor's IP reaches a font CDN: variable files, latin subset. */
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/fonts/EBGaramond-Variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/fonts/EBGaramond-Italic-Variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Sometype Mono';
+  src: url('/fonts/SometypeMono-Variable.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Espresso by default — the card table under a lamp, matching the landing:
    warm dark-brown ground, cream ink, amber cards. */
 :root {
