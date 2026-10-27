@@ -6,7 +6,7 @@ If you discover a security vulnerability in Quorum, please report it responsibly
 
 **Do not open a public GitHub issue.**
 
-Email: **jheison.mb@univerlab.org**
+Email: **hola@univerlab.org**
 
 Include:
 - Description of the vulnerability
