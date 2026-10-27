@@ -1,6 +1,6 @@
 {
   "name": "@univerlab/quorum",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Browser-native planning poker — P2P, no accounts, no server",
   "license": "Apache-2.0",
   "type": "module",
